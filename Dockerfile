@@ -25,7 +25,7 @@ RUN bunx playwright install chromium
 # Build the client for production
 RUN cd client && bun run build
 
-ENV PORT=10000
-EXPOSE 10000
+ENV PORT=8080
+EXPOSE 8080
 
 CMD ["bun", "run", "server.js"]

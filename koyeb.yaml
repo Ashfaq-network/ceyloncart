@@ -1,0 +1,11 @@
+name: ceyloncart
+app:
+  name: ceyloncart
+  regions:
+    - fra
+  routes:
+    - path: /
+      port: 8080
+  env:
+    - key: PORT
+      value: "8080"
