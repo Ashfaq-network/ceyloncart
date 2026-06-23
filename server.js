@@ -34,7 +34,10 @@ async function getKaprukaClient() {
     url: 'https://mcp.kapruka.com/mcp',
   });
   const client = new Client({ name: 'pricespot', version: '1.0.0' });
-  await client.connect(transport);
+  await Promise.race([
+    client.connect(transport),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Kapruka MCP timeout')), 8000)),
+  ]);
   mcpClient = client;
   lastConnected = now;
   return client;
@@ -73,11 +76,17 @@ const GFC_BASE = 'https://globalfoodcity.com/wp-json/wc/store/v1';
 async function searchGFC(query, opts = {}) {
   const params = new URLSearchParams({ search: query, per_page: String(opts.limit || 20) });
   if (opts.cursor) params.set('page', opts.cursor);
-  const res = await fetch(`${GFC_BASE}/products?${params}`);
-  if (!res.ok) throw new Error(`GFC API error: ${res.status}`);
-  const data = await res.json();
-  const total = parseInt(res.headers.get('x-wp-total') || '0');
-  return { raw: Array.isArray(data) ? data : [], total };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const res = await fetch(`${GFC_BASE}/products?${params}`, { signal: controller.signal });
+    if (!res.ok) throw new Error(`GFC API error: ${res.status}`);
+    const data = await res.json();
+    const total = parseInt(res.headers.get('x-wp-total') || '0');
+    return { raw: Array.isArray(data) ? data : [], total };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function normalizeGFC(products) {
@@ -113,10 +122,16 @@ async function searchSPAR(query, opts = {}) {
     'resources[type]': 'product',
     limit: String(opts.limit || 20),
   });
-  const res = await fetch(`${SPAR_BASE}/search/suggest.json?${params}`);
-  if (!res.ok) throw new Error(`SPAR API error: ${res.status}`);
-  const data = await res.json();
-  return data.resources?.results?.products || [];
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(`${SPAR_BASE}/search/suggest.json?${params}`, { signal: controller.signal });
+    if (!res.ok) throw new Error(`SPAR API error: ${res.status}`);
+    const data = await res.json();
+    return data.resources?.results?.products || [];
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function normalizeSPAR(products) {
