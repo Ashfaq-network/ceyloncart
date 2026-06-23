@@ -2,8 +2,7 @@
   "buildCommand": "npm run build",
   "functions": {
     "api/index.js": {
-      "memory": 300,
-      "maxDuration": 30
+      "maxDuration": 60
     }
   },
   "rewrites": [

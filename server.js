@@ -319,8 +319,8 @@ app.get('/api/product-image/:store/:id', async (req, res) => {
 
 // ─── Search all stores helper (no self-fetching) ───
 async function searchAllStores(query, opts = {}) {
-  const { limit = 30, sort = '', cursor = null, category = null } = opts
-  const activeStores = Object.keys(STORES)
+  const { limit = 30, sort = '', cursor = null, category = null, stores = null } = opts
+  const activeStores = stores || Object.keys(STORES)
   const searches = []
 
   if (activeStores.includes('kapruka')) {
@@ -445,7 +445,7 @@ app.get('/api/search', async (req, res) => {
     }
 
     const { merged, matched, total } = await searchAllStores(query, {
-      limit: maxResults, sort, cursor, category,
+      limit: maxResults, sort, cursor, category, stores: activeStores,
     });
 
     // Record prices for history (async, non-blocking)
