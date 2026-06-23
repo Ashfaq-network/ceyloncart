@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { getDb, getCachedSearch, setCachedSearch, getCacheStats, recordEvent, getAnalyticsSummary } from './db.js';
+import { cleanName, formatPrice } from './utils.js';
+import { searchGlomark, normalizeGlomark } from './glomark-connector.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -17,6 +19,7 @@ const STORES = {
   kapruka: { name: 'Kapruka', icon: '🛒', orderable: true, deliveryFee: 250, freeDeliveryMin: 5000 },
   gfc: { name: 'Global Food City', icon: '🏪', orderable: false, deliveryFee: 350, freeDeliveryMin: 3000 },
   spar: { name: 'SPAR', icon: '🛍️', orderable: false, deliveryFee: 300, freeDeliveryMin: 3000 },
+  glomark: { name: 'Glomark', icon: '🛒', orderable: false, deliveryFee: 0, freeDeliveryMin: 0 },
 };
 
 // ─── Kapruka MCP connector ───
@@ -139,17 +142,7 @@ function normalizeSPAR(products) {
 }
 
 // ─── Helpers ───
-function cleanName(name) {
-  return (name || '')
-    .replace(/&#?\w+;/g, '')
-    .replace(/[^\w\s./#,()&-]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function formatPrice(amount) {
-  return `Rs ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
-}
+// cleanName and formatPrice imported from ./utils.js
 
 // ─── Product matching ───
 const KNOWN_BRANDS = new Set([
@@ -351,6 +344,14 @@ async function searchAllStores(query, opts = {}) {
     searches.push(
       searchSPAR(query, { limit })
         .then(normalizeSPAR)
+        .catch(e => ({ results: [], total: 0, _error: e.message }))
+    )
+  }
+
+  if (activeStores.includes('glomark')) {
+    searches.push(
+      searchGlomark(query, { limit })
+        .then(({ products }) => normalizeGlomark(products, STORES.glomark.name))
         .catch(e => ({ results: [], total: 0, _error: e.message }))
     )
   }
