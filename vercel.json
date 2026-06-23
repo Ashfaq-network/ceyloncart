@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm --prefix client install && npm --prefix client run build",
-  "outputDirectory": "client/dist",
+  "outputDirectory": "dist",
   "functions": {
     "api/index.js": {
       "memory": 300,

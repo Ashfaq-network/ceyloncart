@@ -653,7 +653,7 @@ app.get('/admin', (req, res) => {
 })
 
 // ─── Production: serve client build ───
-const clientDist = path.join(__dirname, 'client', 'dist');
+const clientDist = path.join(__dirname, 'dist');
 app.use(express.static(clientDist));
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();

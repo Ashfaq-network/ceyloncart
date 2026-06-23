@@ -4,4 +4,5 @@ cache.db
 cache.db-shm
 cache.db-wal
 client/dist/
+dist/
 client/public/videos/
