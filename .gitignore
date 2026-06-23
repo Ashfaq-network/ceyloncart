@@ -6,3 +6,4 @@ cache.db-wal
 client/dist/
 dist/
 client/public/videos/
+.vercel

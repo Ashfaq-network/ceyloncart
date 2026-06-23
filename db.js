@@ -5,11 +5,17 @@ import { dirname, join } from 'path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const CACHE_TTL = 6 * 60 * 60 * 1000
 
-const dbUrl = process.env.TURSO_DB_URL || `file:${join(__dirname, 'cache.db')}`
-const db = createClient({
-  url: dbUrl,
-  ...(process.env.TURSO_DB_TOKEN ? { authToken: process.env.TURSO_DB_TOKEN } : {}),
-})
+const dbUrl = process.env.TURSO_DB_URL || `file:${process.env.VERCEL ? join('/tmp', 'cache.db') : join(__dirname, 'cache.db')}`
+let db
+try {
+  db = createClient({
+    url: dbUrl,
+    ...(process.env.TURSO_DB_TOKEN ? { authToken: process.env.TURSO_DB_TOKEN } : {}),
+  })
+} catch (e) {
+  console.error('DB init error:', e.message)
+  db = null
+}
 
 let ready = null
 
