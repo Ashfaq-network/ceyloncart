@@ -1,10 +1,10 @@
 {
   "buildCommand": "npm --prefix client install && npm --prefix client run build",
-  "outputDirectory": "dist",
   "functions": {
     "api/index.js": {
       "memory": 300,
-      "maxDuration": 30
+      "maxDuration": 30,
+      "includeFiles": "dist/**"
     }
   },
   "rewrites": [
