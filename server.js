@@ -79,7 +79,11 @@ async function searchGFC(query, opts = {}) {
   try {
     const res = await fetch(`${GFC_BASE}/products?${params}`, {
       signal: controller.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; CeylonCart/1.0)' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json, */*',
+        'Referer': 'https://globalfoodcity.com/',
+      },
     });
     if (!res.ok) throw new Error(`GFC API error: ${res.status}`);
     const data = await res.json();
@@ -374,7 +378,6 @@ async function searchAllStores(query, opts = {}) {
 
   const allResults = await Promise.all(searches)
   const merged = allResults.flatMap(r => r.results)
-  const errors = allResults.filter(r => r._error).map(r => r._error)
 
   merged.sort((a, b) => {
     if (sort === 'price_asc') return a.price - b.price
@@ -385,7 +388,7 @@ async function searchAllStores(query, opts = {}) {
   const matched = matchProducts(merged)
   const total = allResults.reduce((s, r) => s + r.total, 0)
 
-  return { merged, matched, total, errors }
+  return { merged, matched, total }
 }
 
 // ─── API Routes ───
@@ -461,7 +464,7 @@ app.get('/api/search', async (req, res) => {
       if (cached) return res.json(cached);
     }
 
-    const { merged, matched, total, errors } = await searchAllStores(query, {
+    const { merged, matched, total } = await searchAllStores(query, {
       limit: maxResults, sort, cursor, category, stores: activeStores,
     });
 
@@ -484,7 +487,6 @@ app.get('/api/search', async (req, res) => {
       total,
       query,
       stores: Object.keys(STORES),
-      debug: { errors },
     };
 
     await setCachedSearch(normalizedQuery, activeStores, sortParam, response);
