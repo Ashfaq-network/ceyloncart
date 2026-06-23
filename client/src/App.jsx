@@ -309,49 +309,29 @@ export default function App() {
     )}
 
     <div ref={searchRef}>
-      <AnimatePresence mode="popLayout">
-        {loading && (
-          <motion.div
-            key="loader"
-            className="loading-container"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+      {loading && (
+        <div className="loading-container">
+          <div className="loader-ring" />
+          <p>{t('home.searchLoading')}</p>
+        </div>
+      )}
+      {error && !loading && (
+        <div className="error-container">
+          <div className="empty-icon">⚠️</div>
+          <h3 className="empty-title">{t('error.title')}</h3>
+          <p className="error-msg">{error}</p>
+          <button
+            className="browse-all-btn"
+            style={{ marginTop: 16 }}
+            onClick={() => handleSearch(searchQuery || 'grocery', { fast: true })}
           >
-            <div className="loader-ring" />
-            <p>{t('home.searchLoading')}</p>
-          </motion.div>
-        )}
-        {error && !loading && (
-          <motion.div
-            key="error"
-            className="error-container"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <div className="empty-icon">⚠️</div>
-            <h3 className="empty-title">{t('error.title')}</h3>
-            <p className="error-msg">{error}</p>
-            <button
-              className="browse-all-btn"
-              style={{ marginTop: 16 }}
-              onClick={() => handleSearch(searchQuery || 'grocery', { fast: true })}
-            >
-              {t('home.tryAgain')}
-            </button>
-          </motion.div>
-        )}
-        {rawData && !loading && (
-          <motion.section
-            key="results"
-            className="results-section"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="section-label">
+            {t('home.tryAgain')}
+          </button>
+        </div>
+      )}
+      {rawData && !loading && (
+        <section className="results-section">
+          <div className="section-label">
               <span className="label-line" />
               <h2 className="label-text">
                 {rawData.total
@@ -429,9 +409,8 @@ export default function App() {
                 </div>
               </div>
             )}
-          </motion.section>
+          </section>
         )}
-      </AnimatePresence>
     </div>
 
     <GroceryList items={groceryList} stores={stores} onRemove={removeFromGroceryList} onClear={clearGroceryList} />
