@@ -3,13 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node server.js",
-    "start": "node server.js"
+    "dev": "node dev.js",
+    "build": "cd client && npm install && npm run build",
+    "start": "node dev.js"
   },
   "dependencies": {
+    "@libsql/client": "^0.15.0",
     "@modelcontextprotocol/sdk": "^1.13.0",
     "cors": "^2.8.5",
-    "express": "^4.21.0",
-    "playwright": "^1.61.0"
+    "express": "^4.21.0"
   }
 }

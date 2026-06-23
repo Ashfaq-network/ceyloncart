@@ -4,9 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { KeellsConnector } from './keells-connector.js';
-import { CargillsConnector } from './cargills-connector.js';
-import { initDb, getDb, getCachedSearch, setCachedSearch, getCacheStats, recordEvent, getAnalyticsSummary } from './db.js';
+import { getDb, getCachedSearch, setCachedSearch, getCacheStats, recordEvent, getAnalyticsSummary } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -14,63 +12,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ─── Keells (Playwright-based) ───
-let keellsConnector = null;
-let keellsInitializing = false;
-async function getKeells() {
-  if (keellsInitializing) {
-    console.log('[Keells] Waiting for existing init...');
-    while (keellsInitializing) await new Promise(r => setTimeout(r, 500));
-  }
-  if (!keellsConnector) {
-    keellsInitializing = true;
-    keellsConnector = new KeellsConnector();
-    try {
-      console.log('[Keells] Initializing browser...');
-      await keellsConnector.init();
-      console.log('[Keells] Browser ready');
-    } catch (e) {
-      console.error('[Keells] Init failed:', e.message);
-      keellsConnector = null;
-    } finally {
-      keellsInitializing = false;
-    }
-  }
-  return keellsConnector;
-}
-
-// ─── Cargills (Playwright-based) ───
-let cargillsConnector = null;
-let cargillsInitializing = false;
-async function getCargills() {
-  if (cargillsInitializing) {
-    console.log('[Cargills] Waiting for existing init...');
-    while (cargillsInitializing) await new Promise(r => setTimeout(r, 500));
-  }
-  if (!cargillsConnector) {
-    cargillsInitializing = true;
-    cargillsConnector = new CargillsConnector();
-    try {
-      console.log('[Cargills] Initializing browser...');
-      await cargillsConnector.init();
-      console.log('[Cargills] Browser ready');
-    } catch (e) {
-      console.error('[Cargills] Init failed:', e.message);
-      cargillsConnector = null;
-    } finally {
-      cargillsInitializing = false;
-    }
-  }
-  return cargillsConnector;
-}
-
 // ─── Store registry ───
 const STORES = {
   kapruka: { name: 'Kapruka', icon: '🛒', orderable: true, deliveryFee: 250, freeDeliveryMin: 5000 },
   gfc: { name: 'Global Food City', icon: '🏪', orderable: false, deliveryFee: 350, freeDeliveryMin: 3000 },
   spar: { name: 'SPAR', icon: '🛍️', orderable: false, deliveryFee: 300, freeDeliveryMin: 3000 },
-  keells: { name: 'Keells', icon: '🛒', orderable: false, deliveryFee: 399, freeDeliveryMin: 0 },
-  cargills: { name: 'Cargills', icon: '🛒', orderable: false, deliveryFee: 250, freeDeliveryMin: 0 },
 };
 
 // ─── Kapruka MCP connector ───
@@ -195,8 +141,8 @@ function normalizeSPAR(products) {
 // ─── Helpers ───
 function cleanName(name) {
   return (name || '')
-    .replace(/&#?\w+;/g, '')     // remove HTML entities
-    .replace(/[^\w\s./#,()&-]/g, '') // keep only sane chars
+    .replace(/&#?\w+;/g, '')
+    .replace(/[^\w\s./#,()&-]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -225,13 +171,11 @@ const PRODUCT_TYPES = new Set([
   'noodles', 'vermicelli', 'flakes', 'mixture',
 ]);
 
-// Rice varieties — kept separate since 'rice' alone is too broad
 const RICE_VARIETIES = new Set([
   'rice', 'basmathi', 'basmati', 'nadu', 'samba', 'keeri', 'surduru',
   'suduru', 'kaluheenati', 'kuruluthuda', 'raw', 'red', 'white', 'brown',
 ]);
 
-// Normalize quantity to base units (g, ml, pcs)
 function parseQty(name) {
   const m = (name || '').toLowerCase().match(/(\d+\.?\d*)\s*(kg|kilo|kgs|g|gram|grams|l|litre|litres|ml|millilitre|lb|oz|pack|pcs|pieces?|box|bottle|can|sachet|bag)\b/);
   if (!m) return null;
@@ -246,10 +190,6 @@ function parseQty(name) {
   return { value: val, unit };
 }
 
-// Check if two quantities match:
-//   null = unknown (one missing qty) → no penalty
-//   false = different units → hard reject
-//   number = ratio → used as score multiplier below
 function qtyMatch(qa, qb) {
   if (!qa || !qb) return null;
   if (qa.unit !== qb.unit) return false;
@@ -289,30 +229,23 @@ function matchProducts(products) {
       const a = indexed[i];
       const b = indexed[j];
 
-      // Never match same store
       if (a._store === b._store) continue;
 
-      // Quantity check — hard reject only if different units
       const qm = qtyMatch(a._qty, b._qty);
       if (qm === false) continue;
 
       let score = 0;
 
-      // Brand match (+0.30)
       if (a._brand && b._brand && a._brand === b._brand) score += 0.3;
 
-      // Rice variety match (+0.30)
       const varOverlap = a._variety.filter(t => b._variety.includes(t));
       if (varOverlap.length > 0) score += 0.3;
 
-      // Product type match (+0.20)
       const typeOverlap = a._type.filter(t => b._type.includes(t));
       if (typeOverlap.length > 0) score += 0.2;
 
-      // Quantity unit match (+0.05)
       if (a._qty && b._qty && a._qty.unit === b._qty.unit) score += 0.05;
 
-      // Token Jaccard on meaningful remaining words (+0.30 * jaccard)
       const stop = new Set(['per', 'bulk', 'each', 'imp', 'local', 'new', 'premium', 'special']);
       const aRemaining = a._words.filter(w =>
         w !== a._brand && !a._type.includes(w) && !a._variety.includes(w) && !stop.has(w)
@@ -326,7 +259,6 @@ function matchProducts(products) {
         score += 0.3 * (inter.length / union.size);
       }
 
-      // Penalty: asymmetric type/variety — one has "flour" and the other doesn't
       const aOnlyType = a._type.filter(t => !b._type.includes(t));
       const bOnlyType = b._type.filter(t => !a._type.includes(t));
       const aOnlyVar = a._variety.filter(t => !b._variety.includes(t));
@@ -334,19 +266,15 @@ function matchProducts(products) {
       const asymPenalty = (aOnlyType.length + bOnlyType.length + aOnlyVar.length + bOnlyVar.length) * 0.2;
       score = Math.max(0, score - asymPenalty);
 
-      // Penalty: no remaining-word overlap at all
-      // If both sides have remaining words but none overlap, they're likely different items
       if (aRemaining.length > 0 && bRemaining.length > 0) {
         const inter = aRemaining.filter(w => bRemaining.includes(w));
         if (inter.length === 0) score = Math.max(0, score - 0.25);
       }
 
-      // Quantity ratio discount — larger size differences reduce score
       if (typeof qm === 'number' && qm > 1.1) {
         score *= Math.max(0.4, 1 - (qm - 1.1) * 0.3);
       }
 
-      // Price sanity: smooth penalty based on ratio
       if (a.price > 0 && b.price > 0) {
         const ratio = Math.max(a.price, b.price) / Math.min(a.price, b.price);
         if (ratio > 5) score *= 0.3;
@@ -396,14 +324,60 @@ app.get('/api/product-image/:store/:id', async (req, res) => {
   }
 });
 
+// ─── Search all stores helper (no self-fetching) ───
+async function searchAllStores(query, opts = {}) {
+  const { limit = 30, sort = '', cursor = null, category = null } = opts
+  const activeStores = Object.keys(STORES)
+  const searches = []
+
+  if (activeStores.includes('kapruka')) {
+    searches.push(
+      kaprukaCall('kapruka_search_products', {
+        q: query, category: category || null, limit,
+        sort: sort || 'relevance', cursor: cursor || null,
+      }).then(normalizeKapruka).catch(e => ({ results: [], total: 0, _error: e.message }))
+    )
+  }
+
+  if (activeStores.includes('gfc')) {
+    searches.push(
+      searchGFC(query, { limit, cursor })
+        .then(({ raw }) => normalizeGFC(raw))
+        .catch(e => ({ results: [], total: 0, _error: e.message }))
+    )
+  }
+
+  if (activeStores.includes('spar')) {
+    searches.push(
+      searchSPAR(query, { limit })
+        .then(normalizeSPAR)
+        .catch(e => ({ results: [], total: 0, _error: e.message }))
+    )
+  }
+
+  const allResults = await Promise.all(searches)
+  const merged = allResults.flatMap(r => r.results)
+
+  merged.sort((a, b) => {
+    if (sort === 'price_asc') return a.price - b.price
+    if (sort === 'price_desc') return b.price - a.price
+    return 0
+  })
+
+  const matched = matchProducts(merged)
+  const total = allResults.reduce((s, r) => s + r.total, 0)
+
+  return { merged, matched, total }
+}
+
 // ─── API Routes ───
 
 app.get('/api/stores', (req, res) => {
   res.json({ stores: Object.entries(STORES).map(([k, v]) => ({ id: k, ...v })) });
 });
 
-app.get('/api/cache/stats', (req, res) => {
-  res.json(getCacheStats());
+app.get('/api/cache/stats', async (req, res) => {
+  res.json(await getCacheStats());
 });
 
 function normalizeQuery(query) {
@@ -426,9 +400,8 @@ app.get('/api/homepage', async (req, res) => {
     const sectionPromises = Object.entries(HOMEPAGE_SECTIONS).map(async ([section, queries]) => {
       const sectionProducts = [];
       const queryPromises = queries.map(q =>
-        fetch(`http://localhost:${PORT}/api/search?q=${encodeURIComponent(q)}&limit=8`)
-          .then(r => r.json())
-          .then(d => d.results || [])
+        searchAllStores(q, { limit: 8 })
+          .then(r => r.merged)
           .catch(() => [])
       );
       const allResults = await Promise.allSettled(queryPromises);
@@ -462,99 +435,30 @@ app.get('/api/search', async (req, res) => {
     const maxResults = parseInt(limit) || 30;
     const activeStores = storeFilter ? storeFilter.split(',') : Object.keys(STORES);
 
-    // Check cache (skip if skipCache param is set)
     const normalizedQuery = normalizeQuery(query);
     const sortParam = sort || '';
+
     if (!skipCache) {
-      const cached = getCachedSearch(normalizedQuery, activeStores, sortParam);
+      const cached = await getCachedSearch(normalizedQuery, activeStores, sortParam);
       if (cached) return res.json(cached);
     }
 
-    const searches = [];
-
-    if (activeStores.includes('kapruka')) {
-      searches.push(
-        kaprukaCall('kapruka_search_products', {
-          q: query, category: category || null, limit: maxResults,
-          sort: sort || 'relevance', cursor: cursor || null,
-        }).then(normalizeKapruka).catch(e => ({ results: [], total: 0, _error: e.message }))
-      );
-    }
-
-    if (activeStores.includes('gfc')) {
-      searches.push(
-        searchGFC(query, { limit: maxResults, cursor })
-          .then(({ raw }) => normalizeGFC(raw))
-          .catch(e => ({ results: [], total: 0, _error: e.message }))
-      );
-    }
-
-    if (activeStores.includes('spar')) {
-      searches.push(
-        searchSPAR(query, { limit: maxResults })
-          .then(normalizeSPAR)
-          .catch(e => ({ results: [], total: 0, _error: e.message }))
-      );
-    }
-
-    if (activeStores.includes('keells')) {
-      searches.push(
-        (async () => {
-          try {
-            const k = await getKeells();
-            if (!k) return { results: [], total: 0 };
-            const items = await Promise.race([
-              k.search(query, { itemsPerPage: maxResults }),
-              new Promise(r => setTimeout(() => r([]), 30000)),
-            ]);
-            return { results: items, total: items.length };
-          } catch (e) {
-            return { results: [], total: 0, _error: e.message };
-          }
-        })()
-      );
-    }
-
-    if (activeStores.includes('cargills')) {
-      searches.push(
-        (async () => {
-          try {
-            const c = await getCargills();
-            if (!c) return { results: [], total: 0 };
-            const items = await Promise.race([
-              c.search(query, { itemsPerPage: maxResults }),
-              new Promise(r => setTimeout(() => r([]), 30000)),
-            ]);
-            return { results: items, total: items.length };
-          } catch (e) {
-            return { results: [], total: 0, _error: e.message };
-          }
-        })()
-      );
-    }
-
-    const allResults = await Promise.all(searches);
-    const merged = allResults.flatMap(r => r.results);
-
-    merged.sort((a, b) => {
-      if (sort === 'price_asc') return a.price - b.price;
-      if (sort === 'price_desc') return b.price - a.price;
-      return 0;
+    const { merged, matched, total } = await searchAllStores(query, {
+      limit: maxResults, sort, cursor, category,
     });
 
-    const matched = matchProducts(merged);
-    const total = allResults.reduce((s, r) => s + r.total, 0);
-
     // Record prices for history (async, non-blocking)
-    try {
-      const histDb = getDb();
-      if (histDb) {
-        const stmt = histDb.prepare(`INSERT OR IGNORE INTO price_history (product_key, store, price, currency, recorded_at) VALUES (?, ?, ?, ?, datetime('now'))`);
-        for (const p of merged.slice(0, 50)) {
-          stmt.run(`${p.store}:${p.originalId || p.id}`, p.store, p.price, p.currency || 'LKR');
-        }
-      }
-    } catch (_) {}
+    const histDb = getDb();
+    if (histDb) {
+      Promise.allSettled(
+        merged.slice(0, 50).map(p =>
+          histDb.execute({
+            sql: `INSERT OR IGNORE INTO price_history (product_key, store, price, currency, recorded_at) VALUES (?, ?, ?, ?, datetime('now'))`,
+            args: [`${p.store}:${p.originalId || p.id}`, p.store, p.price, p.currency || 'LKR'],
+          })
+        )
+      ).catch(() => {});
+    }
 
     const response = {
       results: merged.slice(0, Math.max(maxResults * 3, 60)),
@@ -564,8 +468,7 @@ app.get('/api/search', async (req, res) => {
       stores: Object.keys(STORES),
     };
 
-    // Cache the result
-    setCachedSearch(normalizedQuery, activeStores, sortParam, response);
+    await setCachedSearch(normalizedQuery, activeStores, sortParam, response);
 
     res.json(response);
   } catch (e) {
@@ -587,7 +490,6 @@ app.get('/api/product/:id', async (req, res) => {
       return res.json(normalizeGFC([p]));
     }
     if (store === 'spar') {
-      // SPAR suggest doesn't have single-product lookup; scrape product page
       const url = req.query.url || `${SPAR_BASE}/products/${originalId}`;
       const resp = await fetch(url);
       if (!resp.ok) throw new Error('Not found');
@@ -676,7 +578,10 @@ app.get('/api/price-history', async (req, res) => {
     const limit = parseInt(days) || 30;
     const histDb = getDb();
     if (!histDb) return res.json({ history: [] });
-    const rows = histDb.query(`SELECT price, currency, recorded_at FROM price_history WHERE product_key = ? AND recorded_at >= datetime('now', '-' || ? || ' days') ORDER BY recorded_at ASC`).all(product_key, limit);
+    const rows = await histDb.execute({
+      sql: `SELECT price, currency, recorded_at FROM price_history WHERE product_key = ? AND recorded_at >= datetime('now', '-' || ? || ' days') ORDER BY recorded_at ASC`,
+      args: [product_key, limit],
+    }).then(r => r.rows);
     res.json({ history: rows, product_key });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -684,15 +589,15 @@ app.get('/api/price-history', async (req, res) => {
 });
 
 // ─── Analytics ───
-app.post('/api/analytics', (req, res) => {
+app.post('/api/analytics', async (req, res) => {
   const { type, session_id, data } = req.body || {}
   if (!type) return res.status(400).json({ error: 'type required' })
-  recordEvent(type, session_id, data, req.ip, req.headers['user-agent'])
+  await recordEvent(type, session_id, data, req.ip, req.headers['user-agent'])
   res.json({ ok: true })
 })
 
-app.get('/api/analytics/dashboard', (req, res) => {
-  res.json(getAnalyticsSummary())
+app.get('/api/analytics/dashboard', async (req, res) => {
+  res.json(await getAnalyticsSummary())
 })
 
 // ─── Admin dashboard page ───
@@ -746,62 +651,6 @@ app.get('/admin', (req, res) => {
   )
 })
 
-// ─── Crawler: pre-cache popular queries ───
-const POPULAR_QUERIES = [
-  'rice', 'sugar', 'dhal', 'milk powder', 'cooking oil',
-  'bread', 'eggs', 'chicken', 'fish', 'onion',
-  'potato', 'tomato', 'coconut', 'banana', 'apple',
-  'noodles', 'pasta', 'biscuit', 'biscuits', 'chocolate',
-  'tea', 'milk', 'yogurt', 'cheese', 'butter',
-  'soap', 'shampoo', 'toothpaste', 'detergent', 'tissue',
-  'water', 'salt', 'chilli', 'turmeric', 'pepper',
-  'cumin', 'gram', 'flour', 'cake',
-  'jam', 'honey', 'vinegar', 'soya',
-  'tuna', 'sardine', 'sausage', 'ice cream',
-  'snacks', 'drinks', 'oil', 'vegetables', 'fruits',
-  'juice', 'dilmah', 'nestle', 'unilever', 'maggi',
-  'prima', 'elephant house',
-];
-
-const CRAWL_INTERVAL = 6 * 60 * 60 * 1000; // every 6 hours
-
-async function runCrawler() {
-  const _db = getDb();
-  const log = _db.query(`INSERT INTO crawl_log (started_at, status) VALUES (datetime('now'), 'running')`).run();
-  const logId = log.lastInsertRowid;
-  const stores = Object.keys(STORES);
-  let totalProducts = 0;
-
-  console.log(`[Crawler] Starting crawl of ${POPULAR_QUERIES.length} queries across ${stores.length} stores...`);
-
-  for (const query of POPULAR_QUERIES) {
-    try {
-      // Check if already cached and fresh
-      const cached = getCachedSearch(normalizeQuery(query), stores, '');
-      if (cached) {
-        totalProducts += cached.results.length;
-        continue;
-      }
-
-      // Do a live search via internal fetch
-      const params = new URLSearchParams({ q: query, limit: '10', skipCache: '1' });
-      const res = await fetch(`http://localhost:${PORT}/api/search?${params}`);
-      if (res.ok) {
-        const data = await res.json();
-        totalProducts += data.results?.length || 0;
-      }
-    } catch (e) {
-      console.error(`[Crawler] Error crawling "${query}":`, e.message);
-    }
-    // Small delay between queries to avoid rate limiting
-    await new Promise(r => setTimeout(r, 1000));
-  }
-
-  _db.run(`UPDATE crawl_log SET completed_at = datetime('now'), queries = ?, products = ?, status = 'completed' WHERE id = ?`,
-    POPULAR_QUERIES.length, totalProducts, logId);
-  console.log(`[Crawler] Completed: ${POPULAR_QUERIES.length} queries, ${totalProducts} products cached`);
-}
-
 // ─── Production: serve client build ───
 const clientDist = path.join(__dirname, 'client', 'dist');
 app.use(express.static(clientDist));
@@ -810,16 +659,4 @@ app.get('*', (req, res, next) => {
   res.sendFile(path.join(clientDist, 'index.html'));
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  initDb();
-  console.log(`CeylonCart API running on port ${PORT}`);
-  // Run crawler after 30s delay (gives Keells time to init)
-  setTimeout(() => {
-    runCrawler().catch(e => console.error('[Crawler] Initial run failed:', e.message));
-  }, 30000);
-  // Schedule crawler every 6 hours
-  setInterval(() => {
-    runCrawler().catch(e => console.error('[Crawler] Scheduled run failed:', e.message));
-  }, CRAWL_INTERVAL);
-});
+export default app;
