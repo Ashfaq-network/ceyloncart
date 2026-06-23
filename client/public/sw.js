@@ -1,65 +1,47 @@
-const CACHE_NAME = 'grocerylk-v1'
-const STATIC_CACHE = 'grocerylk-static-v1'
+const CACHE_NAME = 'grocerylk-v2'
+const STATIC_CACHE = 'grocerylk-static-v2'
 
-const PRECACHE_URLS = [
-  '/',
-  '/src/main.jsx',
-  '/src/App.css',
-  '/manifest.json',
-]
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => {
-      return cache.addAll(PRECACHE_URLS)
-    })
-  )
+self.addEventListener('install', () => {
   self.skipWaiting()
 })
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys
-          .filter((k) => k !== STATIC_CACHE && k !== CACHE_NAME)
-          .map((k) => caches.delete(k))
-      )
-    })
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== STATIC_CACHE && k !== CACHE_NAME).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
   )
-  self.clients.claim()
 })
 
 self.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
 
-  // API calls — network first, fall back to cache
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, clone)
-          })
-          return response
-        })
-        .catch(() => caches.match(request))
+      fetch(request).then((res) => {
+        const clone = res.clone()
+        caches.open(CACHE_NAME).then((c) => c.put(request, clone))
+        return res
+      }).catch(() => caches.match(request))
     )
     return
   }
 
-  // Static assets — cache first
+  if (request.mode === 'navigate') {
+    event.respondWith(fetch(request).catch(() => caches.match(request)))
+    return
+  }
+
   event.respondWith(
-    caches.match(request).then((cached) => {
-      return cached || fetch(request).then((response) => {
-        const clone = response.clone()
-        caches.open(STATIC_CACHE).then((cache) => {
-          if (request.method === 'GET') cache.put(request, clone)
+    caches.open(STATIC_CACHE).then((cache) =>
+      cache.match(request).then((cached) => {
+        const fetchAndCache = fetch(request).then((res) => {
+          if (res.ok) cache.put(request, res.clone())
+          return res
         })
-        return response
+        return cached || fetchAndCache
       })
-    })
+    )
   )
 })
