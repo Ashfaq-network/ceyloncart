@@ -30,9 +30,7 @@ const RECONNECT_INTERVAL = 60000;
 async function getKaprukaClient() {
   const now = Date.now();
   if (mcpClient && (now - lastConnected) < RECONNECT_INTERVAL) return mcpClient;
-  const transport = new StreamableHTTPClientTransport({
-    url: 'https://mcp.kapruka.com/mcp',
-  });
+  const transport = new StreamableHTTPClientTransport('https://mcp.kapruka.com/mcp');
   const client = new Client({ name: 'pricespot', version: '1.0.0' });
   await Promise.race([
     client.connect(transport),
@@ -79,7 +77,10 @@ async function searchGFC(query, opts = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {
-    const res = await fetch(`${GFC_BASE}/products?${params}`, { signal: controller.signal });
+    const res = await fetch(`${GFC_BASE}/products?${params}`, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; CeylonCart/1.0)' },
+    });
     if (!res.ok) throw new Error(`GFC API error: ${res.status}`);
     const data = await res.json();
     const total = parseInt(res.headers.get('x-wp-total') || '0');
