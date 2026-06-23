@@ -373,6 +373,7 @@ async function searchAllStores(query, opts = {}) {
 
   const allResults = await Promise.all(searches)
   const merged = allResults.flatMap(r => r.results)
+  const errors = allResults.filter(r => r._error).map(r => r._error)
 
   merged.sort((a, b) => {
     if (sort === 'price_asc') return a.price - b.price
@@ -383,7 +384,7 @@ async function searchAllStores(query, opts = {}) {
   const matched = matchProducts(merged)
   const total = allResults.reduce((s, r) => s + r.total, 0)
 
-  return { merged, matched, total }
+  return { merged, matched, total, errors }
 }
 
 // ─── API Routes ───
@@ -459,7 +460,7 @@ app.get('/api/search', async (req, res) => {
       if (cached) return res.json(cached);
     }
 
-    const { merged, matched, total } = await searchAllStores(query, {
+    const { merged, matched, total, errors } = await searchAllStores(query, {
       limit: maxResults, sort, cursor, category, stores: activeStores,
     });
 
@@ -482,6 +483,7 @@ app.get('/api/search', async (req, res) => {
       total,
       query,
       stores: Object.keys(STORES),
+      debug: { errors },
     };
 
     await setCachedSearch(normalizedQuery, activeStores, sortParam, response);
