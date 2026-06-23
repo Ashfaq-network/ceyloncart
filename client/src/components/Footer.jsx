@@ -6,7 +6,7 @@ export default function Footer() {
     <footer className="footer">
       <div className="footer-inner">
         <div className="footer-brand">
-          <span className="logo-c">C</span><span className="logo-ey">eylon</span><span className="logo-cart">Cart</span>
+          <span className="logo-c">G</span><span className="logo-ey">rocery</span><span className="logo-cart">LK</span>
           <p className="footer-tagline">Compare. Save. Shop smarter.</p>
         </div>
         <div className="footer-links">

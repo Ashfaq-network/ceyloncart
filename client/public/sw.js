@@ -1,5 +1,5 @@
-const CACHE_NAME = 'ceyloncart-v2'
-const STATIC_CACHE = 'ceyloncart-static-v2'
+const CACHE_NAME = 'grocerylk-v1'
+const STATIC_CACHE = 'grocerylk-static-v1'
 
 const PRECACHE_URLS = [
   '/',

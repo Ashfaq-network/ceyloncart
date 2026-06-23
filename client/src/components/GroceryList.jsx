@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useLang } from '../i18n'
 
@@ -13,10 +13,12 @@ const STORE_NAMES = {
 }
 
 function normalizeName(name) {
+  if (!name || typeof name !== 'string') return ''
   return name.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 function fmtPrice(n) {
+  if (typeof n !== 'number' || isNaN(n)) return 'N/A'
   return 'Rs ' + Math.round(n).toLocaleString('en-LK')
 }
 
@@ -30,15 +32,18 @@ function getDeliveryFee(storeId, total, stores) {
 function buildData(items, includeDelivery, stores) {
   const groups = {}
   for (const item of items) {
+    if (!item || !item.name) continue
     const key = normalizeName(item.name)
+    if (!key) continue
     if (!groups[key]) groups[key] = { name: item.name, key, products: {} }
-    groups[key].products[item.store] = item
+    groups[key].products[item.store || 'unknown'] = item
   }
 
   const plan = {}
   for (const g of Object.values(groups)) {
     const storeList = Object.keys(g.products)
-    const best = storeList.reduce((a, b) => g.products[a].price < g.products[b].price ? a : b)
+    if (storeList.length === 0) continue
+    const best = storeList.reduce((a, b) => (g.products[a]?.price ?? Infinity) < (g.products[b]?.price ?? Infinity) ? a : b)
     if (!plan[best]) plan[best] = []
     plan[best].push({ name: g.name, product: g.products[best], allPrices: g.products })
   }
@@ -47,7 +52,7 @@ function buildData(items, includeDelivery, stores) {
   for (const sid of STORE_ORDER) {
     let total = 0; let count = 0
     for (const g of Object.values(groups)) {
-      if (g.products[sid]) { total += g.products[sid].price; count++ }
+      if (g.products[sid]) { total += (g.products[sid].price || 0); count++ }
     }
     if (count > 0) {
       const fee = includeDelivery ? getDeliveryFee(sid, total, stores) : 0
@@ -55,10 +60,10 @@ function buildData(items, includeDelivery, stores) {
     }
   }
 
-  const optimalTotal = Object.values(plan).flat().reduce((s, i) => s + i.product.price, 0)
+  const optimalTotal = Object.values(plan).flat().reduce((s, i) => s + (i.product?.price || 0), 0)
   const planFees = includeDelivery
     ? Object.entries(plan).reduce((sum, [store, items]) => {
-        const st = items.reduce((s, i) => s + i.product.price, 0)
+        const st = items.reduce((s, i) => s + (i.product?.price || 0), 0)
         return sum + getDeliveryFee(store, st, stores)
       }, 0)
     : 0
@@ -71,7 +76,7 @@ function buildData(items, includeDelivery, stores) {
   }
 
   const sortedPlanEntries = Object.entries(plan).sort(
-    (a, b) => a[1].reduce((s, i) => s + i.product.price, 0) - b[1].reduce((s, i) => s + i.product.price, 0)
+    (a, b) => a[1].reduce((s, i) => s + (i.product?.price || 0), 0) - b[1].reduce((s, i) => s + (i.product?.price || 0), 0)
   )
 
   const sortedStores = STORE_ORDER.filter(s => storeTotals[s])
@@ -80,7 +85,7 @@ function buildData(items, includeDelivery, stores) {
   return { groups, plan, storeTotals, optimalTotal, optimalTotalWithFees, planFees, bestSingleStore, bestSingleTotal, compareTotal, sortedPlanEntries, sortedStores }
 }
 
-export default function GroceryList({ items, stores, onRemove, onClear }) {
+export default function GroceryList({ items = [], stores = [], onRemove = () => {}, onClear = () => {} }) {
   const { t } = useLang()
   const [showAll, setShowAll] = useState(false)
   const [tab, setTab] = useState('items')
@@ -96,10 +101,10 @@ export default function GroceryList({ items, stores, onRemove, onClear }) {
   const hasMore = groupValues.length > 10
 
   const buildShareText = () => {
-    const lines = ['🛒 CeylonCart Shopping Plan', '─────────────────']
+    const lines = ['🛒 GroceryLK Shopping Plan', '─────────────────']
     for (const [store, storeItems] of sortedPlanEntries) {
-      lines.push(`📍 ${STORE_NAMES[store]}`)
-      for (const i of storeItems) lines.push(`   • ${i.name} — ${i.product.priceFormatted}`)
+      lines.push(`📍 ${STORE_NAMES[store] || store}`)
+      for (const i of storeItems) lines.push(`   • ${i.name || ''} — ${i.product?.priceFormatted || ''}`)
     }
     lines.push('─────────────────')
     if (includeDelivery) {
@@ -109,21 +114,21 @@ export default function GroceryList({ items, stores, onRemove, onClear }) {
     }
     if (bestSingleStore) {
       const save = includeDelivery ? (compareTotal - optimalTotalWithFees) : (bestSingleTotal - optimalTotal)
-      lines.push(`✅ Save ${fmtPrice(save)} vs buying all at ${STORE_NAMES[bestSingleStore]}`)
+      lines.push(`✅ Save ${fmtPrice(save)} vs buying all at ${STORE_NAMES[bestSingleStore] || bestSingleStore}`)
     }
     if (includeDelivery && planFees > 0) lines.push(`🚚 Delivery fees: ${fmtPrice(planFees)}`)
-    lines.push('', 'Sent via CeylonCart')
+    lines.push('', 'Sent via GroceryLK')
     return lines.join('\n')
   }
 
   const whatsappText = encodeURIComponent(buildShareText())
 
-  const copyText = useCallback(() => {
+  const copyText = () => {
     navigator.clipboard.writeText(buildShareText()).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }).catch(() => {})
-  }, [items, includeDelivery])
+  }
 
   const saveAmount = bestSingleStore
     ? (includeDelivery ? (compareTotal - optimalTotalWithFees) : (bestSingleTotal - optimalTotal))
@@ -215,7 +220,7 @@ export default function GroceryList({ items, stores, onRemove, onClear }) {
                   </div>
                   <button
                     className="gl-remove-btn"
-                    onClick={() => { const first = Object.values(g.products)[0]; onRemove(first.id || first.originalId) }}
+                    onClick={() => {                   const first = Object.values(g.products)[0]; if (first) onRemove(first.id ?? first.originalId) }}
                     aria-label={t('grocery.remove', { name: g.name })}
                   >✕</button>
                 </motion.div>
@@ -276,15 +281,15 @@ export default function GroceryList({ items, stores, onRemove, onClear }) {
                   </div>
                   <div className="gl-plan-items">
                     {storeItems.map((item, j) => (
-                      <div key={j} className="gl-plan-item">
-                        <span className="gl-plan-item-name">{item.name}</span>
-                        <span className="gl-plan-item-price">{item.product.priceFormatted}</span>
+                      <div key={store + '-' + j} className="gl-plan-item">
+                        <span className="gl-plan-item-name">{item.name || ''}</span>
+                        <span className="gl-plan-item-price">{item.product?.priceFormatted || ''}</span>
                       </div>
                     ))}
                   </div>
                   <a
                     className="gl-plan-order"
-                    href={storeItems[0].product.url}
+                    href={storeItems[0]?.product?.url || '#'}
                     target="_blank"
                     rel="noopener noreferrer"
                   >

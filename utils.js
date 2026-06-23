@@ -7,5 +7,6 @@ export function cleanName(name) {
 }
 
 export function formatPrice(amount) {
+  if (typeof amount !== 'number' || isNaN(amount)) return 'N/A'
   return `Rs ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
 }

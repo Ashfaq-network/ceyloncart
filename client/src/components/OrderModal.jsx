@@ -6,6 +6,22 @@ export default function OrderModal({ product, onClose }) {
   const { t } = useLang()
   const [step, setStep] = useState('form') // form | success | error
   const modalRef = useRef(null)
+  const [cities, setCities] = useState([])
+  const [cityLoading, setCityLoading] = useState(false)
+
+  useEffect(() => {
+    if (product.store !== 'kapruka') return
+    setCityLoading(true)
+    const timer = setTimeout(() => setCityLoading(false), 5000)
+    fetch('/api/cities?limit=50')
+      .then(r => r.json())
+      .then(data => {
+        const list = Array.isArray(data) ? data : data.cities || data.results || []
+        setCities(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setCities([]))
+      .finally(() => { clearTimeout(timer); setCityLoading(false) })
+  }, [product.store])
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -56,6 +72,12 @@ export default function OrderModal({ product, onClose }) {
 
       const data = await res.json()
       if (data.error) throw new Error(data.error)
+
+      const url = data.checkout_url || data.payment_url || data.url || data.redirect_url
+        || data.result?.checkout_url || data.data?.checkout_url
+      const orderRef = data.order_ref || data.order_number || data.orderId || data.reference || data.id
+      data.checkout_url = url || (orderRef ? `https://www.kapruka.com/order/${orderRef}` : '')
+      if (!url) data.order_ref = orderRef || data.order_ref || ''
 
       setOrderResult(data)
       setStep('success')
@@ -129,8 +151,14 @@ export default function OrderModal({ product, onClose }) {
             </div>
 
             <div className="form-group">
-              <label>City</label>
-              <input name="city" value={form.city} onChange={handleChange} required placeholder="Colombo 03" />
+              <label>City {cityLoading && <span style={{ fontSize: 11, color: '#888' }}>(loading...)</span>}</label>
+              <input name="city" value={form.city} onChange={handleChange} required list="city-list" placeholder={cityLoading ? 'Loading cities...' : 'Type a city name...'} autoComplete="off" />
+              <datalist id="city-list">
+                {cities.map(c => {
+                  const v = typeof c === 'string' ? c : c.name || c.city || ''
+                  return <option key={v} value={v} />
+                })}
+              </datalist>
             </div>
 
             <div className="form-group">
@@ -173,17 +201,26 @@ export default function OrderModal({ product, onClose }) {
             <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
               Total: Rs. {orderResult.summary?.grand_total?.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
             </p>
-            <a
-              href={orderResult.checkout_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="checkout-link"
-            >
-              Pay Now →
-            </a>
-            <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 12 }}>
-              Link expires in 60 minutes. Complete payment to confirm your order.
-            </p>
+            {orderResult.checkout_url ? (
+              <>
+                <button
+                  className="checkout-link"
+                  onClick={() => {
+                    const w = window.open(orderResult.checkout_url, '_blank')
+                    if (!w) alert('Popup blocked! Please allow popups or click Done and visit Kapruka with your order reference.')
+                  }}
+                >
+                  Pay Now →
+                </button>
+                <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 12 }}>
+                  Link expires in 60 minutes. Complete payment to confirm your order.
+                </p>
+              </>
+            ) : (
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 12, textAlign: 'center' }}>
+                You will receive a payment link via SMS/email from Kapruka to complete your order.
+              </p>
+            )}
             <button
               className="submit-order-btn"
               style={{ marginTop: 16, background: 'var(--surface2)', color: 'var(--text)' }}

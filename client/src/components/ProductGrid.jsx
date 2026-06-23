@@ -33,7 +33,7 @@ function ProductImage({ product }) {
   )
 }
 
-export default function ProductGrid({ products, onOrder, onAddToList }) {
+export default function ProductGrid({ products = [], onOrder = () => {}, onAddToList = () => {} }) {
   const { t } = useLang()
   if (!products || products.length === 0) return null
 

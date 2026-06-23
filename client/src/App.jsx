@@ -104,10 +104,10 @@ export default function App() {
     setSortBy('')
     setRawData(null)
     try {
-      const { stores: filterStores, category, ...rest } = filters
+      const { stores: filterStores, category, fast, ...rest } = filters
       const params = new URLSearchParams({ q: query, limit: '30', ...rest })
       if (category) params.set('category', category)
-      const stores = filterStores || (filters.fast ? 'kapruka,gfc,spar' : activeStores.join(','))
+      const stores = filterStores != null ? filterStores : (fast ? 'kapruka,gfc,spar' : activeStores.join(','))
       if (stores) params.set('stores', stores)
       const res = await fetch(`/api/search?${params}`)
       const data = await res.json()
@@ -130,35 +130,37 @@ export default function App() {
     )
   }
 
-  const activeResults = rawData ? rawData.results.filter(p => activeStores.includes(p.store)) : []
-  const activeMatched = rawData ? (rawData.matched || [])
+  const activeResults = rawData && Array.isArray(rawData.results) ? rawData.results.filter(p => activeStores.includes(p.store)) : []
+  const activeMatched = rawData && Array.isArray(rawData.matched) ? rawData.matched
+    .filter(Array.isArray)
     .map(g => g.filter(p => activeStores.includes(p.store)))
     .filter(g => g.length > 0) : []
-  const matchedIds = new Set(activeMatched.flat().map(p => p.id))
-  const singlesCount = activeResults.filter(p => !matchedIds.has(p.id)).length
+  const matchedIds = new Set(activeMatched.flat().map(p => p.id).filter(Boolean))
+  const singlesCount = activeResults.filter(p => p.id && !matchedIds.has(p.id)).length
   const filteredCount = singlesCount + activeMatched.flat().length
   const hasActiveFilters = activeStores.length < stores.length
 
   const handleCategorySelect = (name) => {
     track('category_browse', { category: name })
-    handleSearch(name, { stores: 'kapruka', category: name })
+    handleSearch(name, { stores: activeStores.join(','), category: name })
   }
 
   const handleSort = (sort) => {
     if (!rawData) return
+    if (!Array.isArray(rawData.results)) return
     setSortBy(sort)
 
     if (sort === 'price_asc') {
-      const sorted = [...rawData.results].sort((a, b) => a.price - b.price)
-      const matched = (rawData.matched || []).map(g =>
-        [...g].sort((a, b) => a.price - b.price)
-      ).sort((a, b) => a[0].price - b[0].price)
+      const sorted = [...rawData.results].sort((a, b) => (a.price || 0) - (b.price || 0))
+      const matched = (rawData.matched || []).filter(Array.isArray).map(g =>
+        [...g].sort((a, b) => (a.price || 0) - (b.price || 0))
+      ).sort((a, b) => (a[0]?.price || 0) - (b[0]?.price || 0))
       setRawData({ ...rawData, results: sorted, matched })
     } else if (sort === 'price_desc') {
-      const sorted = [...rawData.results].sort((a, b) => b.price - a.price)
-      const matched = (rawData.matched || []).map(g =>
-        [...g].sort((a, b) => a.price - b.price)
-      ).sort((a, b) => b[0].price - a[0].price)
+      const sorted = [...rawData.results].sort((a, b) => (b.price || 0) - (a.price || 0))
+      const matched = (rawData.matched || []).filter(Array.isArray).map(g =>
+        [...g].sort((a, b) => (b.price || 0) - (a.price || 0))
+      ).sort((a, b) => (b[0]?.price || 0) - (a[0]?.price || 0))
       setRawData({ ...rawData, results: sorted, matched })
     } else {
       setRawData({ ...rawData, results: [...rawData.results], matched: [...(rawData.matched || [])] })
@@ -172,27 +174,27 @@ export default function App() {
 
   const addToGroceryList = (product) => {
     setGroceryList(prev => {
-      const key = product.id || product.originalId
-      if (prev.some(p => (p.id || p.originalId) === key)) return prev
-      const next = [...prev, product]
-      localStorage.setItem('groceryList', JSON.stringify(next))
-      track('add_to_list', { productName: product.name, store: product.store })
-      return next
+      const key = product.id ?? product.originalId
+      if (prev.some(p => (p.id ?? p.originalId) === key)) return prev
+      return [...prev, product]
     })
+    track('add_to_list', { productName: product.name, store: product.store })
   }
 
   const removeFromGroceryList = (id) => {
-    setGroceryList(prev => {
-      const next = prev.filter(p => (p.id || p.originalId) !== id)
-      localStorage.setItem('groceryList', JSON.stringify(next))
-      return next
-    })
+    if (id == null) return
+    setGroceryList(prev => prev.filter(p => (p.id ?? p.originalId) !== id))
   }
 
   const clearGroceryList = () => {
     setGroceryList([])
-    localStorage.removeItem('groceryList')
+    try { localStorage.removeItem('groceryList') } catch {}
   }
+
+  // Sync grocery list to localStorage whenever it changes
+  useEffect(() => {
+    try { localStorage.setItem('groceryList', JSON.stringify(groceryList)) } catch {}
+  }, [groceryList])
 
   return (
     <>
@@ -307,7 +309,7 @@ export default function App() {
     )}
 
     <div ref={searchRef}>
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="popLayout">
         {loading && (
           <motion.div
             key="loader"
@@ -320,8 +322,7 @@ export default function App() {
             <p>{t('home.searchLoading')}</p>
           </motion.div>
         )}
-
-        {error && (
+        {error && !loading && (
           <motion.div
             key="error"
             className="error-container"
@@ -341,13 +342,13 @@ export default function App() {
             </button>
           </motion.div>
         )}
-
         {rawData && !loading && (
           <motion.section
             key="results"
             className="results-section"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.5 }}
           >
             <div className="section-label">

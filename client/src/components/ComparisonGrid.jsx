@@ -127,7 +127,7 @@ function ComparisonGroup({ group, index, onOrder, onAddToList }) {
   )
 }
 
-export default function ComparisonGrid({ results, matched, onOrder, onAddToList }) {
+export default function ComparisonGrid({ results = [], matched = [], onOrder = () => {}, onAddToList = () => {} }) {
   const { t } = useLang()
   const matchedIds = new Set()
   const groups = (matched || []).filter(g => {

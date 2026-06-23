@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { getDb, getCachedSearch, setCachedSearch, getCacheStats, recordEvent, getAnalyticsSummary } from './db.js';
+import { getDb, initDb, getCachedSearch, setCachedSearch, getCacheStats, recordEvent, getAnalyticsSummary } from './db.js';
 import { cleanName, formatPrice } from './utils.js';
 import { searchGlomark, normalizeGlomark } from './glomark-connector.js';
 
@@ -398,7 +398,7 @@ app.get('/api/stores', (req, res) => {
 });
 
 app.get('/api/cache/stats', async (req, res) => {
-  res.json(await getCacheStats());
+  try { res.json(await getCacheStats()); } catch (e) { res.status(500).json({ error: 'Internal error' }); }
 });
 
 function normalizeQuery(query) {
@@ -453,13 +453,14 @@ app.get('/api/search', async (req, res) => {
     const query = (q || '').trim();
     if (!query) return res.json({ results: [], matched: [], total: 0, query: '', stores: Object.keys(STORES) });
 
-    const maxResults = parseInt(limit) || 30;
+    const maxResults = parseInt(limit, 10) || 30;
     const activeStores = storeFilter ? storeFilter.split(',') : Object.keys(STORES);
 
     const normalizedQuery = normalizeQuery(query);
     const sortParam = sort || '';
 
-    if (!skipCache) {
+    const skip = skipCache === 'true' || skipCache === true
+    if (!skip) {
       const cached = await getCachedSearch(normalizedQuery, activeStores, sortParam);
       if (cached) return res.json(cached);
     }
@@ -537,7 +538,7 @@ app.get('/api/product/:id', async (req, res) => {
 app.get('/api/categories', async (req, res) => {
   try {
     const data = await kaprukaCall('kapruka_list_categories', {
-      depth: parseInt(req.query.depth) || 1,
+      depth: parseInt(req.query.depth, 10) || 1,
     });
     res.json(data);
   } catch (e) {
@@ -545,12 +546,59 @@ app.get('/api/categories', async (req, res) => {
   }
 });
 
+let citiesCache = null, citiesCacheTime = 0
+const CITIES_CACHE_TTL = 3600000
+
+async function fetchAllCities() {
+  if (citiesCache && Date.now() - citiesCacheTime < CITIES_CACHE_TTL) return citiesCache
+  const db = getDb()
+  if (db) {
+    try {
+      try { await initDb() } catch {}
+      const row = await db.execute(`SELECT value FROM cached_data WHERE key = 'cities_v2'`).then(r => r.rows[0])
+      if (row?.value) {
+        const parsed = JSON.parse(row.value)
+        if (Array.isArray(parsed)) { citiesCache = parsed; citiesCacheTime = Date.now(); return parsed }
+      }
+    } catch {}
+  }
+  const all = [], seen = new Set()
+  const letters = 'abcdefghijklmnopqrstuvwxyz'
+
+  for (const ch of letters) {
+    try {
+      const data = await kaprukaCall('kapruka_list_delivery_cities', { query: ch, limit: 50 })
+      const list = data.cities || []
+      for (const c of list) {
+        const key = c.name?.toLowerCase().trim() || ''
+        if (key && !seen.has(key)) { seen.add(key); all.push(c) }
+      }
+    } catch {}
+  }
+
+  for (const extra of ['we', 'wel', 'well', 'ko', 'kol', 'ne', 'ra', 'ha', 'ma', 'ka', 'pa', 'ba', 'ga', 'da', 'ta', 'th', 'na', 'la', 'sa', 'ja', 'ke', 'ki', 'ku', 'mi', 'mu', 'mo']) {
+    try {
+      const data = await kaprukaCall('kapruka_list_delivery_cities', { query: extra, limit: 50 })
+      const list = data.cities || []
+      for (const c of list) {
+        const key = c.name?.toLowerCase().trim() || ''
+        if (key && !seen.has(key)) { seen.add(key); all.push(c) }
+      }
+    } catch {}
+  }
+
+  citiesCache = all
+  citiesCacheTime = Date.now()
+  if (db) {
+    try { await db.execute({ sql: `INSERT OR REPLACE INTO cached_data (key, value) VALUES ('cities_v2', ?)`, args: [JSON.stringify(all)] }) } catch {}
+  }
+  return all
+}
+
 app.get('/api/cities', async (req, res) => {
   try {
-    const data = await kaprukaCall('kapruka_list_delivery_cities', {
-      query: req.query.query || null, limit: parseInt(req.query.limit) || 25,
-    });
-    res.json(data);
+    const cities = await fetchAllCities()
+    res.json({ cities, total_matched: cities.length })
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -575,6 +623,7 @@ app.post('/api/create-order', async (req, res) => {
       cart, recipient, delivery, sender,
       gift_message: gift_message || null, currency: currency || 'LKR',
     });
+    if (typeof data === 'string') throw new Error(data);
     res.json(data);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -611,21 +660,23 @@ app.get('/api/price-history', async (req, res) => {
 
 // ─── Analytics ───
 app.post('/api/analytics', async (req, res) => {
-  const { type, session_id, data } = req.body || {}
-  if (!type) return res.status(400).json({ error: 'type required' })
-  await recordEvent(type, session_id, data, req.ip, req.headers['user-agent'])
-  res.json({ ok: true })
+  try {
+    const { type, session_id, data } = req.body || {}
+    if (!type) return res.status(400).json({ error: 'type required' })
+    await recordEvent(type, session_id, data, req.ip, req.headers['user-agent'])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ ok: false }) }
 })
 
 app.get('/api/analytics/dashboard', async (req, res) => {
-  res.json(await getAnalyticsSummary())
+  try { res.json(await getAnalyticsSummary()) } catch (e) { res.json({}) }
 })
 
 // ─── Admin dashboard page ───
 app.get('/admin', (req, res) => {
   res.type('html').send(
     '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">' +
-    '<title>CeylonCart Analytics</title>' +
+    '<title>GroceryLK Analytics</title>' +
     '<style>' +
     '*{margin:0;padding:0;box-sizing:border-box}' +
     'body{font-family:system-ui,-apple-system,sans-serif;background:#0d1117;color:#c9d1d9;padding:40px 24px;max-width:800px;margin:0 auto}' +
@@ -638,7 +689,7 @@ app.get('/admin', (req, res) => {
     '.stat-value{font-size:28px;font-weight:700;color:#f0f6fc}' +
     '.stat-label{font-size:11px;color:#8b949e;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px}' +
     '</style></head><body>' +
-    '<h1>CeylonCart</h1><p class="sub">Analytics Dashboard</p>' +
+    '<h1>GroceryLK</h1><p class="sub">Analytics Dashboard</p>' +
     '<div id="app"><p style="text-align:center;padding:60px;color:#8b949e;font-size:14px">Loading...</p></div>' +
     '<script>' +
     'async function load(){' +

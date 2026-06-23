@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLang } from '../i18n'
 
-export default function Navbar({ categories, onCategorySelect, groceryCount }) {
+export default function Navbar({ categories = [], onCategorySelect = () => {}, groceryCount = 0 }) {
   const { t, lang, toggleLang } = useLang()
   const [showCat, setShowCat] = useState(false)
   const catRef = useRef(null)
@@ -32,7 +32,7 @@ export default function Navbar({ categories, onCategorySelect, groceryCount }) {
       transition={{ duration: 0.6, ease: 'easeOut' }}
     >
       <a href="/" className="nav-logo">
-        <span className="logo-c">C</span><span className="logo-ey">eylon</span><span className="logo-cart">Cart</span>
+        <span className="logo-c">G</span><span className="logo-ey">rocery</span><span className="logo-cart">LK</span>
         <span className="sub">Compare & Save</span>
       </a>
 

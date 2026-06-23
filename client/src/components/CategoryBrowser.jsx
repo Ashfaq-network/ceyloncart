@@ -80,7 +80,7 @@ function getIcon(name) {
   return '🛍️'
 }
 
-export default function CategoryBrowser({ categories, onSelect }) {
+export default function CategoryBrowser({ categories = [], onSelect = () => {} }) {
   const { t } = useLang()
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, margin: '-60px' })

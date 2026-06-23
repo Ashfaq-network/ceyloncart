@@ -9,7 +9,7 @@ const STORES = [
   { name: 'Cargills', color: '#ff8f00' },
 ]
 
-export default function Hero({ onSearch }) {
+export default function Hero({ onSearch = () => {} }) {
   const { t, lang } = useLang()
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -23,7 +23,7 @@ export default function Hero({ onSearch }) {
         <div className="hero-compact-top">
           <div className="hero-logo-icon">🛒</div>
           <h1 className="hero-compact-title">
-            <span className="logo-c">C</span><span className="logo-ey">eylon</span><span className="logo-cart">Cart</span>
+            <span className="logo-c">G</span><span className="logo-ey">rocery</span><span className="logo-cart">LK</span>
           </h1>
           <p className="hero-compact-sub">
             {t('hero.subtitle')}

@@ -52,11 +52,17 @@ async function ensureReady() {
       user_agent TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`)
+    await db.execute(`CREATE TABLE IF NOT EXISTS cached_data (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`)
   })()
   return ready
 }
 
 export function getDb() { return db }
+export async function initDb() { await ensureReady() }
 
 export async function getCachedSearch(query, stores, sort) {
   await ensureReady()

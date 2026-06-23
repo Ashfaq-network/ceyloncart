@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 
 const en = {
   langName: 'English',
-  appName: 'CeylonCart',
+  appName: 'GroceryLK',
   nav: {
     groceryList: 'Grocery List',
     about: 'About',
@@ -82,14 +82,14 @@ const en = {
     priceStable: '\u2192 Stable',
   },
   about: {
-    title: 'About CeylonCart',
-    description: 'CeylonCart compares grocery prices across Sri Lanka\'s top stores \u2014 Kapruka, Keells, Cargills, Global Food City, and SPAR \u2014 so you always find the best deal.',
+    title: 'About GroceryLK',
+    description: 'GroceryLK compares grocery prices across Sri Lanka\'s top stores \u2014 Kapruka, Keells, Cargills, Global Food City, and SPAR \u2014 so you always find the best deal.',
     stores: 'Stores',
     products: 'Products',
     realTime: 'Real-Time',
     home: 'Home',
     about: 'About',
-    copyright: '\u00a9 {year} CeylonCart. All rights reserved.',
+    copyright: '\u00a9 {year} GroceryLK. All rights reserved.',
   },
   order: {
     title: 'Order Item',
@@ -103,7 +103,7 @@ const en = {
 
 const si = {
   langName: 'සිංහල',
-  appName: 'සෙයිලන්කාර්ට්',
+  appName: 'ග්‍රොසරි එල්කේ',
   nav: {
     groceryList: 'සාප්පු ලැයිස්තුව',
     about: 'අපි ගැන',
@@ -183,14 +183,14 @@ const si = {
     priceStable: '\u2192 ස්ථාවර',
   },
   about: {
-    title: 'සෙයිලන්කාර්ට් ගැන',
-    description: 'සෙයිලන්කාර්ට් ශ්‍රී ලංකාවේ ප්‍රමුඛ වෙළඳසැල් \u2014 Kapruka, Keells, Cargills, Global Food City, සහ SPAR \u2014 හරහා සාප්පු මිල ගණන් සංසන්දනය කරයි, එවිට ඔබට සැමවිටම හොඳම මිල සොයාගත හැකිය.',
+    title: 'ග්‍රොසරි එල්කේ ගැන',
+    description: 'ග්‍රොසරි එල්කේ ශ්‍රී ලංකාවේ ප්‍රමුඛ වෙළඳසැල් \u2014 Kapruka, Keells, Cargills, Global Food City, සහ SPAR \u2014 හරහා සාප්පු මිල ගණන් සංසන්දනය කරයි, එවිට ඔබට සැමවිටම හොඳම මිල සොයාගත හැකිය.',
     stores: 'වෙළඳසැල්',
     products: 'නිෂ්පාදන',
     realTime: 'සැබෑ කාලය',
     home: 'මුල් පිටුව',
     about: 'අපි ගැන',
-    copyright: '\u00a9 {year} සෙයිලන්කාර්ට්. සියලුම හිමිකම් ඇවිරිණි.',
+    copyright: '\u00a9 {year} ග්‍රොසරි එල්කේ. සියලුම හිමිකම් ඇවිරිණි.',
   },
   order: {
     title: 'ඇණවුම් අයිතමය',
@@ -208,12 +208,12 @@ const LangContext = createContext()
 
 export function LangProvider({ children }) {
   const [lang, setLang] = useState(() => {
-    try { return localStorage.getItem('ceyloncart_lang') || 'en' }
+    try { return localStorage.getItem('grocerylk_lang') || 'en' }
     catch { return 'en' }
   })
 
   useEffect(() => {
-    try { localStorage.setItem('ceyloncart_lang', lang) }
+    try { localStorage.setItem('grocerylk_lang', lang) }
     catch {}
   }, [lang])
 
