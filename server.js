@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { getDb, initDb, getCachedSearch, setCachedSearch, getCacheStats, recordEvent, getAnalyticsSummary } from './db.js';
+import { getDb, initDb, getCachedSearch, setCachedSearch, getCacheStats, recordEvent, getAnalyticsSummary, getCachedCategory, setCachedCategory } from './db.js';
 import { cleanName, formatPrice } from './utils.js';
 import { searchGlomark, normalizeGlomark } from './glomark-connector.js';
 import { searchArpico } from './arpico-connector.js';
@@ -602,6 +602,12 @@ app.get('/api/search', async (req, res) => {
     const sortParam = sort || '';
 
     const skip = skipCache === 'true' || skipCache === true
+
+    if (category && !skip) {
+      const catCached = await getCachedCategory(category);
+      if (catCached) return res.json(catCached);
+    }
+
     if (!skip && activeStores && activeStores.length > 0) {
       const cached = await getCachedSearch(normalizedQuery, activeStores, sortParam);
       if (cached) return res.json(cached);
@@ -626,6 +632,11 @@ app.get('/api/search', async (req, res) => {
       }
     }
 
+    if (category && total < 3) {
+      const catCached = await getCachedCategory(category);
+      if (catCached) return res.json(catCached);
+    }
+
     // Record prices for history (async, non-blocking)
     const histDb = getDb();
     if (histDb) {
@@ -646,6 +657,10 @@ app.get('/api/search', async (req, res) => {
       query,
       stores: Object.keys(STORES),
     };
+
+    if (category && total >= 3) {
+      setCachedCategory(category, response);
+    }
 
     await setCachedSearch(normalizedQuery, activeStores, sortParam, response);
 

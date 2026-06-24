@@ -151,6 +151,32 @@ export async function getAnalyticsSummary() {
   } catch (e) { return {} }
 }
 
+const CAT_CACHE_TTL = 24 * 60 * 60 * 1000
+
+export async function getCachedCategory(category) {
+  await ensureReady()
+  try {
+    const row = await db.execute({
+      sql: `SELECT value, updated_at FROM cached_data WHERE key = ?`,
+      args: [`cat_${category}`],
+    }).then(r => r.rows[0])
+    if (!row) return null
+    const age = Date.now() - new Date(row.updated_at + 'Z').getTime()
+    if (age > CAT_CACHE_TTL) return null
+    return JSON.parse(row.value)
+  } catch { return null }
+}
+
+export async function setCachedCategory(category, data) {
+  await ensureReady()
+  try {
+    await db.execute({
+      sql: `INSERT OR REPLACE INTO cached_data (key, value, updated_at) VALUES (?, ?, datetime('now'))`,
+      args: [`cat_${category}`, JSON.stringify(data)],
+    })
+  } catch {}
+}
+
 export async function getCacheStats() {
   await ensureReady()
   try {
