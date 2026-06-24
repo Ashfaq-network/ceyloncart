@@ -527,10 +527,10 @@ function normalizeQuery(query) {
 }
 
 const HOMEPAGE_SECTIONS = {
-  featured: ['rice', 'dhal', 'milk', 'eggs', 'bread', 'sugar', 'coconut', 'noodles', 'tinned fish'],
-  new: ['snacks', 'chocolate', 'drinks', 'biscuits', 'cereal', 'ice cream', 'yogurt', 'pasta'],
-  bestsellers: ['dilmah', 'nestle', 'maggi', 'prima', 'soap', 'shampoo', 'detergent', 'toothpaste'],
-  suggested: ['fruits', 'chicken', 'cheese', 'butter', 'spices', 'curry', 'jam', 'sauce'],
+  featured: ['rice', 'dhal', 'coconut', 'milk', 'eggs', 'tea', 'bread', 'sugar', 'noodles', 'tinned fish'],
+  new: ['snacks', 'chocolate', 'drinks', 'biscuits', 'ice cream', 'yogurt', 'juice', 'water', 'pasta', 'cereal'],
+  bestsellers: ['dilmah', 'nestle', 'unilever', 'maggi', 'prima', 'elephant house', 'soap', 'shampoo', 'detergent', 'toothpaste'],
+  suggested: ['fruits', 'vegetables', 'chicken', 'fish', 'cheese', 'butter', 'curry', 'spices', 'sauce', 'jam'],
 };
 
 app.get('/api/homepage', async (req, res) => {
@@ -543,16 +543,15 @@ app.get('/api/homepage', async (req, res) => {
       if (cached) return res.json(JSON.parse(cached.value))
     }
 
+    const ALL_STORES = Object.keys(STORES);
     const result = {};
     const globalSeen = new Set();
     const MAX_PER_SECTION = 20;
-    const MAX_PER_QUERY = 5;
 
-    const startAll = Date.now()
     const sectionPromises = Object.entries(HOMEPAGE_SECTIONS).map(async ([section, queries]) => {
-      const products = [];
+      const sectionProducts = [];
       const queryPromises = queries.map(q =>
-        searchAllStores(q, { limit: 8 })
+        searchAllStores(q, { limit: 8, stores: ALL_STORES })
           .then(r => r.merged)
           .catch(() => [])
       );
@@ -560,19 +559,15 @@ app.get('/api/homepage', async (req, res) => {
 
       for (const r of allResults) {
         if (r.status !== 'fulfilled') continue;
-        let added = 0;
         for (const p of r.value) {
-          if (added >= MAX_PER_QUERY) break;
           const key = `${p.store}-${p.originalId || p.name}`;
-          if (globalSeen.has(key)) continue;
-          globalSeen.add(key);
-          added++;
-          products.push(p);
-          if (products.length >= MAX_PER_SECTION) break;
+          if (!globalSeen.has(key) && sectionProducts.length < MAX_PER_SECTION) {
+            globalSeen.add(key);
+            sectionProducts.push(p);
+          }
         }
-        if (products.length >= MAX_PER_SECTION) break;
       }
-      result[section] = products;
+      result[section] = sectionProducts;
     });
 
     await Promise.all(sectionPromises);
@@ -599,7 +594,8 @@ app.get('/api/search', async (req, res) => {
     if (!query) return res.json({ results: [], matched: [], total: 0, query: '', stores: Object.keys(STORES) });
 
     const maxResults = parseInt(limit, 10) || 30;
-    const activeStores = storeFilter ? storeFilter.split(',') : null;
+    const isFast = fast === 'true'
+    const activeStores = storeFilter ? storeFilter.split(',') : (isFast ? null : Object.keys(STORES));
 
     const normalizedQuery = normalizeQuery(query);
     const sortParam = sort || '';
@@ -611,7 +607,7 @@ app.get('/api/search', async (req, res) => {
     }
 
     const { merged, matched, total } = await searchAllStores(query, {
-      limit: maxResults, sort, cursor, category, stores: activeStores, fast: fast === 'true',
+      limit: maxResults, sort, cursor, category, stores: activeStores, fast: isFast,
     });
 
     // Record prices for history (async, non-blocking)
