@@ -1378,6 +1378,28 @@ input { font-family: inherit; outline: none; }
   transition: all 0.2s;
 }
 .gl-copy-btn:hover { background: var(--surface2); }
+.share-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.share-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.share-btn.whatsapp { background: #25D366; color: #fff; }
+.share-btn.copy { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+
 .gl-share-btn {
   display: inline-block;
   background: #25D366;

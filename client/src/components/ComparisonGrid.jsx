@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useLang } from '../i18n'
+import { track } from '../analytics'
 
 const STORE_COLORS = {
   kapruka: '#e53935',
@@ -129,6 +130,52 @@ function ComparisonGroup({ group, index, onOrder, onAddToList }) {
   )
 }
 
+function ShareButton({ groups, singles, query }) {
+  const { t } = useLang()
+  const [copied, setCopied] = useState(false)
+  const buildText = () => {
+    const lines = [`🛒 GroceryLK — Price Comparison`, `─────────────────`]
+    if (query) lines.push(`🔍 "${query}"`)
+    lines.push('')
+    if (groups.length > 0) {
+      for (const g of groups.slice(0, 5)) {
+        const sorted = [...g].sort((a, b) => a.price - b.price)
+        lines.push(`🏆 ${sorted[0].name}`)
+        for (const p of sorted) {
+          const mark = p.price === sorted[0].price ? '✅' : '  '
+          lines.push(` ${mark} ${p.storeName}: ${p.priceFormatted}`)
+        }
+        lines.push('')
+      }
+      if (groups.length > 5) lines.push(`... +${groups.length - 5} more items`)
+    }
+    if (singles.length > 0) lines.push(`📦 ${singles.length} more products from other stores`)
+    lines.push('', `Sent via GroceryLK`, `https://grocerylk.vercel.app/`)
+    return lines.join('\n')
+  }
+  const handleWhatsApp = () => {
+    track('share', { method: 'whatsapp', hasQuery: !!query })
+    window.open(`https://wa.me/?text=${encodeURIComponent(buildText())}`, '_blank')
+  }
+  const handleCopy = () => {
+    navigator.clipboard.writeText(buildText()).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }).catch(() => {})
+    track('share', { method: 'copy', hasQuery: !!query })
+  }
+  return (
+    <div className="share-buttons">
+      <button className="share-btn whatsapp" onClick={handleWhatsApp} aria-label={t('grocery.shareWhatsApp')}>
+        📱 {t('grocery.shareWhatsApp')}
+      </button>
+      <button className="share-btn copy" onClick={handleCopy} aria-label="Copy text">
+        {copied ? '✓ Copied!' : '📋 Copy Text'}
+      </button>
+    </div>
+  )
+}
+
 export default function ComparisonGrid({ results = [], matched = [], onOrder = () => {}, onAddToList = () => {} }) {
   const { t } = useLang()
   const matchedIds = new Set()
@@ -153,6 +200,7 @@ export default function ComparisonGrid({ results = [], matched = [], onOrder = (
             <h2 className="label-text">{t('product.priceComparison')}</h2>
             <span className="label-line" />
           </div>
+          <ShareButton groups={groups} singles={singles} query="" />
           <div className="comparison-grid">
             {groups.map((group, i) => (
               <ComparisonGroup key={i} group={group} index={i} onOrder={onOrder} onAddToList={onAddToList} />
