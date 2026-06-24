@@ -596,7 +596,16 @@ app.get('/api/search', async (req, res) => {
 
     const maxResults = parseInt(limit, 10) || 30;
     const isFast = fast === 'true'
-    const activeStores = storeFilter ? storeFilter.split(',') : (isFast ? null : Object.keys(STORES));
+    let activeStores
+    if (storeFilter) {
+      activeStores = storeFilter.split(',')
+    } else if (category) {
+      activeStores = ['kapruka']
+    } else if (isFast) {
+      activeStores = null
+    } else {
+      activeStores = Object.keys(STORES)
+    }
 
     const normalizedQuery = normalizeQuery(query);
     const sortParam = sort || '';
