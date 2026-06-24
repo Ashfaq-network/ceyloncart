@@ -527,20 +527,34 @@ function normalizeQuery(query) {
 }
 
 const HOMEPAGE_SECTIONS = {
-  featured: ['rice', 'dhal', 'coconut', 'milk', 'eggs', 'tea', 'bread', 'sugar'],
-  new: ['snacks', 'noodles', 'chocolate', 'drinks', 'biscuits', 'oil', 'soap', 'shampoo'],
-  bestsellers: ['dilmah', 'nestle', 'unilever', 'maggi', 'prima', 'elephant house'],
-  suggested: ['fruits', 'vegetables', 'chicken', 'fish', 'yogurt', 'cheese', 'butter', 'juice'],
+  featured: ['rice', 'dhal', 'milk', 'eggs', 'tea', 'bread', 'sugar', 'coconut', 'noodles', 'tinned fish'],
+  new: ['snacks', 'chocolate', 'drinks', 'biscuits', 'ice cream', 'yogurt', 'juice', 'water', 'pasta', 'cereal'],
+  bestsellers: ['dilmah', 'nestle', 'unilever', 'maggi', 'prima', 'elephant house', 'soap', 'shampoo', 'detergent', 'toothpaste'],
+  suggested: ['fruits', 'vegetables', 'chicken', 'fish', 'cheese', 'butter', 'curry', 'spices', 'sauce', 'jam'],
 };
+
+function hasImage(p) {
+  return !!(p.image && p.image !== '' && !p.image.includes('not_available'))
+}
 
 app.get('/api/homepage', async (req, res) => {
   try {
+    const db = getDb()
+    if (db) {
+      const cached = await db.execute({
+        sql: `SELECT value FROM cached_data WHERE key = 'homepage' AND updated_at > datetime('now', '-1 hour')`,
+      }).then(r => r.rows[0])
+      if (cached) return res.json(JSON.parse(cached.value))
+    }
+
     const result = {};
     const globalSeen = new Set();
-    const MAX_PER_SECTION = 20;
+    const MAX_PER_SECTION = 24;
+    const MAX_PER_QUERY = 3;
 
     const sectionPromises = Object.entries(HOMEPAGE_SECTIONS).map(async ([section, queries]) => {
-      const sectionProducts = [];
+      const withImg = [];
+      const withoutImg = [];
       const queryPromises = queries.map(q =>
         searchAllStores(q, { limit: 8 })
           .then(r => r.merged)
@@ -550,18 +564,43 @@ app.get('/api/homepage', async (req, res) => {
 
       for (const r of allResults) {
         if (r.status !== 'fulfilled') continue;
+        let added = 0;
         for (const p of r.value) {
+          if (added >= MAX_PER_QUERY) break;
           const key = `${p.store}-${p.originalId || p.name}`;
-          if (!globalSeen.has(key) && sectionProducts.length < MAX_PER_SECTION) {
-            globalSeen.add(key);
-            sectionProducts.push(p);
-          }
+          if (globalSeen.has(key)) continue;
+          globalSeen.add(key);
+          added++;
+          if (hasImage(p)) withImg.push(p);
+          else withoutImg.push(p);
+          if (withImg.length >= MAX_PER_SECTION) break;
+        }
+        if (withImg.length >= MAX_PER_SECTION) break;
+      }
+
+      if (withImg.length < MAX_PER_SECTION) {
+        for (const p of withoutImg) {
+          if (withImg.length >= MAX_PER_SECTION) break;
+          const key = `${p.store}-${p.originalId || p.name}`;
+          if (globalSeen.has(key)) continue;
+          globalSeen.add(key);
+          withImg.push(p);
         }
       }
-      result[section] = sectionProducts;
+      result[section] = withImg;
     });
 
     await Promise.all(sectionPromises);
+
+    if (db) {
+      try {
+        await db.execute({
+          sql: `INSERT OR REPLACE INTO cached_data (key, value, updated_at) VALUES ('homepage', ?, datetime('now'))`,
+          args: [JSON.stringify({ sections: result })],
+        })
+      } catch {}
+    }
+
     res.json({ sections: result });
   } catch (e) {
     res.json({ sections: {}, error: e.message });
