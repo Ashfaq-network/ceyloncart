@@ -18,6 +18,7 @@ const STORE_COLORS = {
   spar: '#f9a825',
   keells: '#2e7d32',
   cargills: '#ff8f00',
+  arpico: '#0b2545',
 }
 
 export default function App() {
@@ -107,8 +108,12 @@ export default function App() {
       const { stores: filterStores, category, fast, ...rest } = filters
       const params = new URLSearchParams({ q: query, limit: '30', ...rest })
       if (category) params.set('category', category)
-      const stores = filterStores != null ? filterStores : (fast ? 'kapruka,gfc,spar' : activeStores.join(','))
-      if (stores) params.set('stores', stores)
+      if (fast) {
+        params.set('fast', 'true')
+      } else if (filterStores != null) {
+        params.set('stores', filterStores)
+      }
+      // When no stores param is sent, server auto-selects based on health tracking
       const res = await fetch(`/api/search?${params}`)
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -142,7 +147,11 @@ export default function App() {
 
   const handleCategorySelect = (name) => {
     track('category_browse', { category: name })
-    handleSearch(name, { stores: activeStores.join(','), category: name })
+    const filters = { category: name }
+    if (activeStores.length < stores.length) {
+      filters.stores = activeStores.join(',')
+    }
+    handleSearch(name, filters)
   }
 
   const handleSort = (sort) => {

@@ -7,6 +7,23 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { getDb, initDb, getCachedSearch, setCachedSearch, getCacheStats, recordEvent, getAnalyticsSummary } from './db.js';
 import { cleanName, formatPrice } from './utils.js';
 import { searchGlomark, normalizeGlomark } from './glomark-connector.js';
+import { searchArpico } from './arpico-connector.js';
+
+// ─── Scraped data from GitHub Actions ───
+const SCRAPED_STORES = ['gfc', 'keells', 'cargills']
+
+async function getScrapedResults(store, query) {
+  try {
+    const db = getDb()
+    if (!db) return null
+    const row = await db.execute({
+      sql: `SELECT data FROM scraped_data WHERE store = ? AND query = ?`,
+      args: [store, query.toLowerCase().trim()],
+    }).then(r => r.rows[0])
+    if (!row) return null
+    return JSON.parse(row.data)
+  } catch { return null }
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,6 +38,9 @@ const STORES = {
   gfc: { name: 'Global Food City', icon: '🏪', orderable: false, deliveryFee: 350, freeDeliveryMin: 3000 },
   spar: { name: 'SPAR', icon: '🛍️', orderable: false, deliveryFee: 300, freeDeliveryMin: 3000 },
   glomark: { name: 'Glomark', icon: '🛒', orderable: false, deliveryFee: 0, freeDeliveryMin: 0 },
+  arpico: { name: 'Arpico', icon: '🏪', orderable: false, deliveryFee: 0, freeDeliveryMin: 0 },
+  keells: { name: 'Keells', icon: '🏪', orderable: false, deliveryFee: 0, freeDeliveryMin: 0 },
+  cargills: { name: 'Cargills', icon: '🏪', orderable: false, deliveryFee: 0, freeDeliveryMin: 0 },
 };
 
 // ─── Kapruka MCP connector ───
@@ -338,42 +358,152 @@ app.get('/api/product-image/:store/:id', async (req, res) => {
   }
 });
 
-// ─── Search all stores helper (no self-fetching) ───
+// ─── Store Health Tracking ───
+const STORE_PRIORITY = ['kapruka', 'spar', 'glomark', 'arpico', 'gfc', 'keells', 'cargills']
+
+async function getStoreHealth() {
+  try {
+    const db = getDb()
+    if (!db) return {}
+    const row = await db.execute({
+      sql: `SELECT value FROM cached_data WHERE key = 'store_health'`
+    })
+    if (row.rows.length > 0) return JSON.parse(row.rows[0].value)
+  } catch {}
+  return {}
+}
+
+async function updateStoreHealth(storeId, success) {
+  try {
+    const db = getDb()
+    if (!db) return
+    const health = await getStoreHealth()
+    const now = Date.now()
+    const entry = health[storeId] || { successes: 0, failures: 0, lastCheck: 0, healthy: true }
+    entry.lastCheck = now
+    if (success) {
+      entry.successes++
+      entry.failures = 0
+      entry.healthy = true
+    } else {
+      entry.failures++
+      entry.healthy = entry.failures < 5
+    }
+    health[storeId] = entry
+    await db.execute({
+      sql: `INSERT OR REPLACE INTO cached_data (key, value) VALUES ('store_health', ?)`,
+      args: [JSON.stringify(health)]
+    })
+  } catch {}
+}
+
+function getAutoStores(health, fast) {
+  const all = Object.keys(STORES)
+  if (Object.keys(health).length === 0) {
+    const preferred = fast ? ['kapruka', 'spar', 'glomark'] : all
+    return preferred.filter(s => STORES[s])
+  }
+  const healthy = all.filter(id => health[id] ? health[id].healthy !== false : true)
+  if (fast) {
+    return healthy.filter(s => STORE_PRIORITY.indexOf(s) <= STORE_PRIORITY.indexOf('glomark'))
+  }
+  return healthy
+}
+
+// ─── Search all stores helper with auto health tracking ───
 async function searchAllStores(query, opts = {}) {
-  const { limit = 30, sort = '', cursor = null, category = null, stores = null } = opts
-  const activeStores = stores || Object.keys(STORES)
+  const { limit = 30, sort = '', cursor = null, category = null, stores = null, fast = false } = opts
+  
+  let activeStores
+  if (stores && stores.length > 0) {
+    activeStores = stores
+  } else {
+    const health = await getStoreHealth()
+    activeStores = getAutoStores(health, fast)
+  }
+  
   const searches = []
+  const trackHealth = !(stores && stores.length > 0)
+
+  function tracked(storeId, fn) {
+    const promise = fn()
+    if (!trackHealth) {
+      return promise.catch(e => ({ results: [], total: 0, _error: e.message }))
+    }
+    return promise
+      .then(r => { updateStoreHealth(storeId, true); return r })
+      .catch(e => { updateStoreHealth(storeId, false); return { results: [], total: 0, _error: e.message } })
+  }
 
   if (activeStores.includes('kapruka')) {
     searches.push(
-      kaprukaCall('kapruka_search_products', {
-        q: query, category: category || null, limit,
-        sort: sort || 'relevance', cursor: cursor || null,
-      }).then(normalizeKapruka).catch(e => ({ results: [], total: 0, _error: e.message }))
+      tracked('kapruka', () =>
+        kaprukaCall('kapruka_search_products', {
+          q: query, category: category || null, limit,
+          sort: sort || 'relevance', cursor: cursor || null,
+        }).then(normalizeKapruka)
+      )
     )
+  }
+
+  async function withScrapeFallback(storeId, liveFn) {
+    try {
+      const scraped = await getScrapedResults(storeId, query)
+      if (scraped && scraped.results && scraped.results.length > 0) {
+        return scraped
+      }
+    } catch {}
+    return tracked(storeId, liveFn)
   }
 
   if (activeStores.includes('gfc')) {
     searches.push(
-      searchGFC(query, { limit, cursor })
-        .then(({ raw }) => normalizeGFC(raw))
-        .catch(e => ({ results: [], total: 0, _error: e.message }))
+      withScrapeFallback('gfc', () =>
+        searchGFC(query, { limit, cursor })
+          .then(({ raw }) => normalizeGFC(raw))
+      )
+    )
+  }
+
+  if (activeStores.includes('keells')) {
+    searches.push(
+      withScrapeFallback('keells', () =>
+        Promise.reject(new Error('Keells blocked on Vercel'))
+      )
+    )
+  }
+
+  if (activeStores.includes('cargills')) {
+    searches.push(
+      withScrapeFallback('cargills', () =>
+        Promise.reject(new Error('Cargills blocked on Vercel'))
+      )
     )
   }
 
   if (activeStores.includes('spar')) {
     searches.push(
-      searchSPAR(query, { limit })
-        .then(normalizeSPAR)
-        .catch(e => ({ results: [], total: 0, _error: e.message }))
+      tracked('spar', () =>
+        searchSPAR(query, { limit })
+          .then(normalizeSPAR)
+      )
     )
   }
 
   if (activeStores.includes('glomark')) {
     searches.push(
-      searchGlomark(query, { limit })
-        .then(({ products }) => normalizeGlomark(products, STORES.glomark.name))
-        .catch(e => ({ results: [], total: 0, _error: e.message }))
+      tracked('glomark', () =>
+        searchGlomark(query, { limit })
+          .then(({ products }) => normalizeGlomark(products, STORES.glomark.name))
+      )
+    )
+  }
+
+  if (activeStores.includes('arpico')) {
+    searches.push(
+      tracked('arpico', () =>
+        searchArpico(query, { limit })
+      )
     )
   }
 
@@ -450,24 +580,24 @@ app.get('/api/homepage', async (req, res) => {
 
 app.get('/api/search', async (req, res) => {
   try {
-    const { q, category, limit, sort, cursor, stores: storeFilter, skipCache } = req.query;
+    const { q, category, limit, sort, cursor, stores: storeFilter, skipCache, fast } = req.query;
     const query = (q || '').trim();
     if (!query) return res.json({ results: [], matched: [], total: 0, query: '', stores: Object.keys(STORES) });
 
     const maxResults = parseInt(limit, 10) || 30;
-    const activeStores = storeFilter ? storeFilter.split(',') : Object.keys(STORES);
+    const activeStores = storeFilter ? storeFilter.split(',') : null;
 
     const normalizedQuery = normalizeQuery(query);
     const sortParam = sort || '';
 
     const skip = skipCache === 'true' || skipCache === true
-    if (!skip) {
+    if (!skip && activeStores && activeStores.length > 0) {
       const cached = await getCachedSearch(normalizedQuery, activeStores, sortParam);
       if (cached) return res.json(cached);
     }
 
     const { merged, matched, total } = await searchAllStores(query, {
-      limit: maxResults, sort, cursor, category, stores: activeStores,
+      limit: maxResults, sort, cursor, category, stores: activeStores, fast: fast === 'true',
     });
 
     // Record prices for history (async, non-blocking)
@@ -673,6 +803,13 @@ app.post('/api/analytics', async (req, res) => {
 
 app.get('/api/analytics/dashboard', async (req, res) => {
   try { res.json(await getAnalyticsSummary()) } catch (e) { res.json({}) }
+})
+
+app.get('/api/store-health', async (req, res) => {
+  try {
+    const health = await getStoreHealth()
+    res.json({ stores: Object.keys(STORES), health })
+  } catch { res.json({ stores: Object.keys(STORES), health: {} }) }
 })
 
 // ─── Admin dashboard page ───

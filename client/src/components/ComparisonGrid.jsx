@@ -8,6 +8,8 @@ const STORE_COLORS = {
   spar: '#f9a825',
   keells: '#2e7d32',
   cargills: '#ff8f00',
+  glomark: '#7b1fa2',
+  arpico: '#0b2545',
 }
 
 function ProductImage({ product, className = 'comp-img', fallbackClass = 'comp-img-fallback' }) {

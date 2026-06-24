@@ -7,6 +7,8 @@ const STORES = [
   { name: 'SPAR', color: '#f9a825' },
   { name: 'Keells', color: '#2e7d32' },
   { name: 'Cargills', color: '#ff8f00' },
+  { name: 'Glomark', color: '#7b1fa2' },
+  { name: 'Arpico', color: '#0b2545' },
 ]
 
 export default function Hero({ onSearch = () => {} }) {

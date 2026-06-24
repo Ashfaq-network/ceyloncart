@@ -57,6 +57,13 @@ async function ensureReady() {
       value TEXT NOT NULL,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`)
+    await db.execute(`CREATE TABLE IF NOT EXISTS scraped_data (
+      store TEXT NOT NULL,
+      query TEXT NOT NULL,
+      data TEXT NOT NULL,
+      scraped_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (store, query)
+    )`)
   })()
   return ready
 }

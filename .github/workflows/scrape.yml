@@ -1,0 +1,48 @@
+name: Scrape Stores
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      store:
+        description: 'Store to scrape (gfc, keells, cargills, or all)'
+        required: false
+        default: 'all'
+      query:
+        description: 'Single query to scrape (optional, scrapes all if empty)'
+        required: false
+        default: ''
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      TURSO_DB_URL: ${{ secrets.TURSO_DB_URL }}
+      TURSO_DB_TOKEN: ${{ secrets.TURSO_DB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+
+      - name: Scrape GFC
+        if: ${{ github.event.inputs.store == '' || github.event.inputs.store == 'all' || github.event.inputs.store == 'gfc' }}
+        run: node scripts/scrape-all.js gfc
+
+      - name: Scrape Keells
+        if: ${{ github.event.inputs.store == '' || github.event.inputs.store == 'all' || github.event.inputs.store == 'keells' }}
+        run: node scripts/scrape-all.js keells
+
+      - name: Scrape Cargills
+        if: ${{ github.event.inputs.store == '' || github.event.inputs.store == 'all' || github.event.inputs.store == 'cargills' }}
+        run: node scripts/scrape-all.js cargills
