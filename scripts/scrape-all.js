@@ -38,7 +38,7 @@ async function scrapeStoreBatch(store, queries, opts = {}) {
   }
 }
 
-const PLAYWRIGHT_STORES = ['keells', 'cargills']
+const PLAYWRIGHT_STORES = ['cargills']
 
 async function main() {
   console.log('Initializing DB...')
@@ -46,14 +46,13 @@ async function main() {
   console.log(`Starting scrape for ${QUERIES.length} queries\n`)
 
   const storeName = process.argv[2]
-  if (storeName && !['gfc', 'keells', 'cargills'].includes(storeName)) {
-    console.error(`Unknown store: ${storeName}. Options: gfc, keells, cargills`)
+  if (storeName && !['gfc', 'cargills'].includes(storeName)) {
+    console.error(`Unknown store: ${storeName}. Options: gfc, cargills`)
     process.exit(1)
   }
 
   const SCRAPER_NAMES = {
     gfc: 'scrapeGFC',
-    keells: 'scrapeKeells',
     cargills: 'scrapeCargills',
   }
 
@@ -61,7 +60,6 @@ async function main() {
     ? [{ name: storeName, fn: (await import(`./scrapers/${storeName}.js`))[SCRAPER_NAMES[storeName]] }]
     : [
         { name: 'gfc', fn: (await import('./scrapers/gfc.js')).scrapeGFC },
-        { name: 'keells', fn: (await import('./scrapers/keells.js')).scrapeKeells },
         { name: 'cargills', fn: (await import('./scrapers/cargills.js')).scrapeCargills },
       ]
 

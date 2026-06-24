@@ -1,7 +1,7 @@
 {
   "name": "GroceryLK — Sri Lanka Grocery Price Comparison",
   "short_name": "GroceryLK",
-  "description": "Compare grocery prices across Kapruka, Keells, Cargills, Global Food City & SPAR.",
+  "description": "Compare grocery prices across Kapruka, Cargills, Global Food City & SPAR.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

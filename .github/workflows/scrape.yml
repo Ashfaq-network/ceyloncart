@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       store:
-        description: 'Store to scrape (gfc, keells, cargills, or all)'
+        description: 'Store to scrape (gfc, cargills, or all)'
         required: false
         default: 'all'
       query:
@@ -39,9 +39,6 @@ jobs:
         if: ${{ github.event.inputs.store == '' || github.event.inputs.store == 'all' || github.event.inputs.store == 'gfc' }}
         run: node scripts/scrape-all.js gfc
 
-      - name: Scrape Keells
-        if: ${{ github.event.inputs.store == '' || github.event.inputs.store == 'all' || github.event.inputs.store == 'keells' }}
-        run: node scripts/scrape-all.js keells
 
       - name: Scrape Cargills
         if: ${{ github.event.inputs.store == '' || github.event.inputs.store == 'all' || github.event.inputs.store == 'cargills' }}

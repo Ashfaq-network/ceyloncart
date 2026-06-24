@@ -5,7 +5,7 @@ const STORES = [
   { name: 'Kapruka', color: '#e53935' },
   { name: 'Global Food City', color: '#1565c0' },
   { name: 'SPAR', color: '#f9a825' },
-  { name: 'Keells', color: '#2e7d32' },
+
   { name: 'Cargills', color: '#ff8f00' },
   { name: 'Glomark', color: '#7b1fa2' },
   { name: 'Arpico', color: '#0b2545' },

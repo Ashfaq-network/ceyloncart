@@ -6,7 +6,7 @@ const STORE_COLORS = {
   kapruka: '#e53935',
   gfc: '#1565c0',
   spar: '#f9a825',
-  keells: '#2e7d32',
+
   cargills: '#ff8f00',
   glomark: '#7b1fa2',
   arpico: '#0b2545',

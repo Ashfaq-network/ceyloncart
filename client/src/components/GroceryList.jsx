@@ -2,14 +2,14 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useLang } from '../i18n'
 
-const STORE_ORDER = ['kapruka', 'gfc', 'spar', 'keells', 'cargills', 'glomark', 'arpico']
+const STORE_ORDER = ['kapruka', 'gfc', 'spar', 'cargills', 'glomark', 'arpico']
 const STORE_COLORS = {
   kapruka: '#e53935', gfc: '#1565c0', spar: '#f9a825',
-  keells: '#2e7d32', cargills: '#ff8f00', glomark: '#7b1fa2', arpico: '#0b2545',
+  cargills: '#ff8f00', glomark: '#7b1fa2', arpico: '#0b2545',
 }
 const STORE_NAMES = {
   kapruka: 'Kapruka', gfc: 'GFC', spar: 'SPAR',
-  keells: 'Keells', cargills: 'Cargills', glomark: 'Glomark', arpico: 'Arpico',
+  cargills: 'Cargills', glomark: 'Glomark', arpico: 'Arpico',
 }
 
 function normalizeName(name) {

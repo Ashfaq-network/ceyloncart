@@ -14,7 +14,7 @@ export default function Footer() {
           <a className="footer-link" href="#about">{t('about.about')}</a>
         </div>
         <div className="footer-stores">
-          {['Kapruka', 'Keells', 'Cargills', 'Global Food City', 'SPAR'].map(s => (
+          {['Kapruka', 'Cargills', 'Global Food City', 'SPAR'].map(s => (
             <span key={s} className="footer-store">{s}</span>
           ))}
         </div>

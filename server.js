@@ -10,7 +10,7 @@ import { searchGlomark, normalizeGlomark } from './glomark-connector.js';
 import { searchArpico } from './arpico-connector.js';
 
 // ─── Scraped data from GitHub Actions ───
-const SCRAPED_STORES = ['gfc', 'keells', 'cargills']
+const SCRAPED_STORES = ['gfc', 'cargills']
 
 async function getScrapedResults(store, query) {
   try {
@@ -39,7 +39,6 @@ const STORES = {
   spar: { name: 'SPAR', icon: '🛍️', orderable: false, deliveryFee: 300, freeDeliveryMin: 3000 },
   glomark: { name: 'Glomark', icon: '🛒', orderable: false, deliveryFee: 0, freeDeliveryMin: 0 },
   arpico: { name: 'Arpico', icon: '🏪', orderable: false, deliveryFee: 0, freeDeliveryMin: 0 },
-  keells: { name: 'Keells', icon: '🏪', orderable: false, deliveryFee: 0, freeDeliveryMin: 0 },
   cargills: { name: 'Cargills', icon: '🏪', orderable: false, deliveryFee: 0, freeDeliveryMin: 0 },
 };
 
@@ -359,7 +358,7 @@ app.get('/api/product-image/:store/:id', async (req, res) => {
 });
 
 // ─── Store Health Tracking ───
-const STORE_PRIORITY = ['kapruka', 'spar', 'glomark', 'arpico', 'gfc', 'keells', 'cargills']
+const STORE_PRIORITY = ['kapruka', 'spar', 'glomark', 'arpico', 'gfc', 'cargills']
 
 async function getStoreHealth() {
   try {
@@ -461,14 +460,6 @@ async function searchAllStores(query, opts = {}) {
       withScrapeFallback('gfc', () =>
         searchGFC(query, { limit, cursor })
           .then(({ raw }) => normalizeGFC(raw))
-      )
-    )
-  }
-
-  if (activeStores.includes('keells')) {
-    searches.push(
-      withScrapeFallback('keells', () =>
-        Promise.reject(new Error('Keells blocked on Vercel'))
       )
     )
   }

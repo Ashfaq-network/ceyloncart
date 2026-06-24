@@ -83,7 +83,7 @@ const en = {
   },
   about: {
     title: 'About GroceryLK',
-    description: 'GroceryLK compares grocery prices across Sri Lanka\'s top stores \u2014 Kapruka, Keells, Cargills, Global Food City, and SPAR \u2014 so you always find the best deal.',
+    description: 'GroceryLK compares grocery prices across Sri Lanka\'s top stores \u2014 Kapruka, Cargills, Global Food City, and SPAR \u2014 so you always find the best deal.',
     stores: 'Stores',
     products: 'Products',
     realTime: 'Real-Time',
@@ -184,7 +184,7 @@ const si = {
   },
   about: {
     title: 'ග්‍රොසරි එල්කේ ගැන',
-    description: 'ග්‍රොසරි එල්කේ ශ්‍රී ලංකාවේ ප්‍රමුඛ වෙළඳසැල් \u2014 Kapruka, Keells, Cargills, Global Food City, සහ SPAR \u2014 හරහා සාප්පු මිල ගණන් සංසන්දනය කරයි, එවිට ඔබට සැමවිටම හොඳම මිල සොයාගත හැකිය.',
+    description: 'ග්‍රොසරි එල්කේ ශ්‍රී ලංකාවේ ප්‍රමුඛ වෙළඳසැල් \u2014 Kapruka, Cargills, Global Food City, සහ SPAR \u2014 හරහා සාප්පු මිල ගණන් සංසන්දනය කරයි, එවිට ඔබට සැමවිටම හොඳම මිල සොයාගත හැකිය.',
     stores: 'වෙළඳසැල්',
     products: 'නිෂ්පාදන',
     realTime: 'සැබෑ කාලය',
