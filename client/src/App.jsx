@@ -64,38 +64,16 @@ export default function App() {
         setActiveStores((d.stores || []).map(s => s.id))
       })
       .catch(() => {})
-    const queries = {
-      featured: ['rice', 'dhal', 'coconut', 'milk', 'eggs', 'tea', 'bread', 'sugar'],
-      new: ['snacks', 'noodles', 'chocolate', 'drinks', 'biscuits', 'oil', 'soap', 'shampoo'],
-      bestsellers: ['dilmah', 'nestle', 'unilever', 'maggi', 'prima', 'elephant house'],
-      suggested: ['fruits', 'vegetables', 'chicken', 'fish', 'yogurt', 'cheese', 'butter', 'juice'],
-    }
-    const setters = {
-      featured: setFeaturedProducts,
-      new: setNewProducts,
-      bestsellers: setBestsellerProducts,
-      suggested: setSuggestedProducts,
-    }
-    for (const [section, qs] of Object.entries(queries)) {
-      for (const q of qs) {
-        fetch(`/api/search?q=${encodeURIComponent(q)}&limit=8`)
-          .then(r => r.json())
-          .then(d => {
-            if (d.results) {
-              setters[section](prev => {
-                const combined = [...prev]
-                for (const p of d.results) {
-                  if (!combined.some(x => x.id === p.id) && combined.length < 20) {
-                    combined.push(p)
-                  }
-                }
-                return combined
-              })
-            }
-          })
-          .catch(() => {})
-      }
-    }
+    fetch('/api/homepage')
+      .then(r => r.json())
+      .then(d => {
+        const s = d.sections || {}
+        setFeaturedProducts(s.featured || [])
+        setNewProducts(s.new || [])
+        setBestsellerProducts(s.bestsellers || [])
+        setSuggestedProducts(s.suggested || [])
+      })
+      .catch(() => {})
   }, [])
 
   const handleSearch = async (query, filters = {}) => {
@@ -434,7 +412,7 @@ export default function App() {
         <p>{t('about.description')}</p>
         <div className="about-stats">
           <div className="about-stat">
-            <span className="about-stat-value">5</span>
+            <span className="about-stat-value">6</span>
             <span className="about-stat-label">{t('about.stores')}</span>
           </div>
           <div className="about-stat">
