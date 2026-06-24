@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "node dev.js",
-    "build": "cd client && npm install && npm run build",
+    "build": "cd client && npm install && npm run build && cp sw.js ../dist/",
     "start": "node dev.js"
   },
   "dependencies": {
