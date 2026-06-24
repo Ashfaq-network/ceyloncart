@@ -527,64 +527,60 @@ function normalizeQuery(query) {
 }
 
 const HOMEPAGE_SECTIONS = {
-  featured: ['rice', 'dhal', 'coconut', 'milk', 'eggs', 'tea', 'bread', 'sugar', 'noodles', 'tinned fish'],
-  new: ['snacks', 'chocolate', 'drinks', 'biscuits', 'ice cream', 'yogurt', 'juice', 'water', 'pasta', 'cereal'],
-  bestsellers: ['dilmah', 'nestle', 'unilever', 'maggi', 'prima', 'elephant house', 'soap', 'shampoo', 'detergent', 'toothpaste'],
-  suggested: ['fruits', 'vegetables', 'chicken', 'fish', 'cheese', 'butter', 'curry', 'spices', 'sauce', 'jam'],
+  featured: ['rice', 'dhal', 'milk', 'eggs', 'bread', 'sugar'],
+  new: ['snacks', 'chocolate', 'drinks', 'biscuits', 'cereal'],
+  bestsellers: ['dilmah', 'nestle', 'maggi', 'prima', 'soap'],
+  suggested: ['fruits', 'chicken', 'cheese', 'butter', 'curry'],
 };
 
 app.get('/api/homepage', async (req, res) => {
-  try {
-    const db = getDb()
-    if (db) {
-      const cached = await db.execute({
-        sql: `SELECT value FROM cached_data WHERE key = 'homepage_v2' AND updated_at > datetime('now', '-3 hours')`,
-      }).then(r => r.rows[0])
-      if (cached) return res.json(JSON.parse(cached.value))
-    }
+  const db = getDb()
+  if (db) {
+    const cached = await db.execute({
+      sql: `SELECT value FROM cached_data WHERE key = 'homepage_v3' AND updated_at > datetime('now', '-4 hours')`,
+    }).then(r => r.rows[0]).catch(() => null)
+    if (cached) return res.json(JSON.parse(cached.value))
+  }
 
-    const ALL_STORES = Object.keys(STORES);
-    const result = {};
-    const globalSeen = new Set();
-    const MAX_PER_SECTION = 20;
+  const result = {};
+  const globalSeen = new Set();
+  const MAX_PER_SECTION = 20;
 
-    const sectionPromises = Object.entries(HOMEPAGE_SECTIONS).map(async ([section, queries]) => {
-      const sectionProducts = [];
-      const queryPromises = queries.map(q =>
-        searchAllStores(q, { limit: 8, stores: ALL_STORES })
-          .then(r => r.merged)
-          .catch(() => [])
-      );
-      const allResults = await Promise.allSettled(queryPromises);
+  const ALL_STORES = Object.keys(STORES);
+  const sectionPromises = Object.entries(HOMEPAGE_SECTIONS).map(async ([section, queries]) => {
+    const sectionProducts = [];
+    const queryPromises = queries.map(q =>
+      searchAllStores(q, { limit: 6, stores: ALL_STORES })
+        .then(r => r.merged)
+        .catch(() => [])
+    );
+    const allResults = await Promise.allSettled(queryPromises);
 
-      for (const r of allResults) {
-        if (r.status !== 'fulfilled') continue;
-        for (const p of r.value) {
-          const key = `${p.store}-${p.originalId || p.name}`;
-          if (!globalSeen.has(key) && sectionProducts.length < MAX_PER_SECTION) {
-            globalSeen.add(key);
-            sectionProducts.push(p);
-          }
+    for (const r of allResults) {
+      if (r.status !== 'fulfilled') continue;
+      for (const p of r.value) {
+        const key = `${p.store}-${p.originalId || p.name}`;
+        if (!globalSeen.has(key) && sectionProducts.length < MAX_PER_SECTION) {
+          globalSeen.add(key);
+          sectionProducts.push(p);
         }
       }
-      result[section] = sectionProducts;
-    });
-
-    await Promise.all(sectionPromises);
-
-    if (db) {
-      try {
-        await db.execute({
-          sql: `INSERT OR REPLACE INTO cached_data (key, value, updated_at) VALUES ('homepage_v2', ?, datetime('now'))`,
-          args: [JSON.stringify({ sections: result })],
-        });
-      } catch {}
     }
+    result[section] = sectionProducts;
+  });
 
-    res.json({ sections: result });
-  } catch (e) {
-    res.json({ sections: {}, error: e.message });
+  await Promise.all(sectionPromises);
+
+  if (db) {
+    try {
+      await db.execute({
+        sql: `INSERT OR REPLACE INTO cached_data (key, value, updated_at) VALUES ('homepage_v3', ?, datetime('now'))`,
+        args: [JSON.stringify({ sections: result })],
+      });
+    } catch {}
   }
+
+  res.json({ sections: result });
 });
 
 app.get('/api/search', async (req, res) => {
