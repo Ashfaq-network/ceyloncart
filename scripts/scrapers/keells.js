@@ -1,5 +1,3 @@
-import { chromium } from 'playwright'
-
 const STEALTH_SCRIPT = () => {
   Object.defineProperty(navigator, 'webdriver', { get: () => undefined })
   Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] })
@@ -98,7 +96,8 @@ export async function scrapeKeells(query, opts = {}) {
 }
 
 export async function createBrowser() {
-  const browser = await chromium.launch({
+  const { chromium: pw } = await import('playwright')
+  const browser = await pw.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-blink-features=AutomationControlled'],
   })

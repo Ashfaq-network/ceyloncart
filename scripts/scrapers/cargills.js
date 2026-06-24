@@ -1,5 +1,3 @@
-import { chromium } from 'playwright'
-
 async function trySearchCargills(page, query) {
   const searchInput = page.locator('#txtSearch')
   const count = await searchInput.count()
@@ -133,7 +131,8 @@ export async function scrapeCargills(query, opts = {}) {
 }
 
 export async function createBrowser() {
-  const browser = await chromium.launch({
+  const { chromium: pw } = await import('playwright')
+  const browser = await pw.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-blink-features=AutomationControlled'],
   })
