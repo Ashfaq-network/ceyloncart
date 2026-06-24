@@ -40,8 +40,14 @@ async function main() {
     process.exit(1)
   }
 
+  const SCRAPER_NAMES = {
+    gfc: 'scrapeGFC',
+    keells: 'scrapeKeells',
+    cargills: 'scrapeCargills',
+  }
+
   const stores = storeName
-    ? [{ name: storeName, fn: (await import(`./scrapers/${storeName}.js`))[`scrape${storeName.charAt(0).toUpperCase() + storeName.slice(1)}`] }]
+    ? [{ name: storeName, fn: (await import(`./scrapers/${storeName}.js`))[SCRAPER_NAMES[storeName]] }]
     : [
         { name: 'gfc', fn: (await import('./scrapers/gfc.js')).scrapeGFC },
         { name: 'keells', fn: (await import('./scrapers/keells.js')).scrapeKeells },
