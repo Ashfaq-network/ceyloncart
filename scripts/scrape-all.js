@@ -6,33 +6,44 @@ const QUERIES = [
   'dilmah', 'nestle', 'unilever', 'maggi', 'prima', 'elephant house',
   'fruits', 'vegetables', 'chicken', 'fish', 'yogurt', 'cheese', 'butter', 'juice',
   'water', 'salt', 'flour', 'pasta', 'sauce', 'spices', 'curry', 'rice flour',
-  'sugar', 'milk powder', 'tinned fish', 'jam', 'honey', 'cereal', 'ice cream',
-  'yogurt drink', 'toothpaste', 'soap', 'detergent', 'tissue', 'light bulb',
+  'milk powder', 'tinned fish', 'jam', 'honey', 'cereal', 'ice cream',
+  'yogurt drink', 'toothpaste', 'detergent', 'tissue', 'light bulb',
 ]
 
-async function scrapeStore(name, scraperFn, query) {
+const CONCURRENCY = 3
+
+async function scrapeOne(store, query, opts = {}) {
   const start = Date.now()
   try {
-    const result = await scraperFn(query, { limit: 20 })
+    const result = await store.fn(query, { limit: 20, ...opts })
     const elapsed = ((Date.now() - start) / 1000).toFixed(1)
     if (result.results.length > 0) {
-      await saveScrapedResults(name, query, result)
-      await logScrape(name, query, 'success', result.results.length, `${elapsed}s`)
-      console.log(`  ✓ ${name} "${query}": ${result.results.length} items (${elapsed}s)`)
+      await saveScrapedResults(store.name, query, result)
+      await logScrape(store.name, query, 'success', result.results.length, `${elapsed}s`)
+      console.log(`  ✓ ${store.name} "${query}": ${result.results.length} items (${elapsed}s)`)
     } else {
-      await logScrape(name, query, 'empty', 0, `${elapsed}s`)
-      console.log(`  - ${name} "${query}": 0 items (${elapsed}s)`)
+      await logScrape(store.name, query, 'empty', 0, `${elapsed}s`)
+      console.log(`  - ${store.name} "${query}": 0 items (${elapsed}s)`)
     }
   } catch (e) {
-    await logScrape(name, query, 'error', 0, e.message)
-    console.error(`  ✗ ${name} "${query}": ${e.message}`)
+    await logScrape(store.name, query, 'error', 0, e.message)
+    console.error(`  ✗ ${store.name} "${query}": ${e.message}`)
   }
 }
+
+async function scrapeStoreBatch(store, queries, opts = {}) {
+  for (let i = 0; i < queries.length; i += CONCURRENCY) {
+    const batch = queries.slice(i, i + CONCURRENCY)
+    await Promise.allSettled(batch.map(q => scrapeOne(store, q, opts)))
+  }
+}
+
+const PLAYWRIGHT_STORES = ['keells', 'cargills']
 
 async function main() {
   console.log('Initializing DB...')
   await initScrapeDb()
-  console.log(`Starting scrape for ${QUERIES.length} queries across 3 stores...\n`)
+  console.log(`Starting scrape for ${QUERIES.length} queries\n`)
 
   const storeName = process.argv[2]
   if (storeName && !['gfc', 'keells', 'cargills'].includes(storeName)) {
@@ -58,8 +69,16 @@ async function main() {
 
   for (const store of stores) {
     console.log(`\n--- ${store.name} ---`)
-    for (const q of QUERIES) {
-      await scrapeStore(store.name, store.fn, q)
+    if (PLAYWRIGHT_STORES.includes(store.name)) {
+      const mod = await import(`./scrapers/${store.name}.js`)
+      const browser = await mod.createBrowser()
+      try {
+        await scrapeStoreBatch(store, QUERIES, { browser })
+      } finally {
+        await browser.close()
+      }
+    } else {
+      await scrapeStoreBatch(store, QUERIES)
     }
   }
 
