@@ -1,51 +1,3 @@
-async function trySearchCargills(page, query) {
-  const searchInput = page.locator('#txtSearch')
-  const count = await searchInput.count()
-  if (count === 0) return false
-
-  await searchInput.first().click()
-  await searchInput.first().fill(query)
-  await page.waitForTimeout(500)
-  const btn = page.locator('#btnSearch')
-  if (await btn.count() > 0) {
-    await btn.first().click()
-  } else {
-    await page.keyboard.press('Enter')
-  }
-  return true
-}
-
-async function extractProducts(page) {
-  return await page.evaluate(() => {
-    const items = new Map()
-    const selectors = [
-      '[ng-repeat*="product in DS.Data"]',
-      '.cargillProdNeed',
-      '.prdSH',
-      '[class*="pro-"]',
-      '.cargillProdNeedImg1',
-    ]
-    for (const sel of selectors) {
-      for (const el of document.querySelectorAll(sel)) {
-        const nameEl = el.querySelector('[class*="title"], [class*="name"], [class*="Name"], [class*="ItemName"], h3, h4, h5, p.lH22, p[class*="name"]')
-        const name = nameEl?.textContent?.trim() || ''
-        const priceEl = el.querySelector('[class*="price"], [class*="Price"], .offer-price, .regular-price, [class*="offer"]')
-        const priceText = priceEl?.textContent?.trim() || ''
-        const price = parseFloat(priceText.replace(/[^0-9.]/g, '').replace(/,/g, '')) || 0
-        const img = el.querySelector('img')
-        const image = img?.getAttribute('src') || img?.getAttribute('ng-src') || ''
-        const link = el.querySelector('a')?.getAttribute('href') || ''
-        const url = link.startsWith('http') ? link : `https://cargillsonline.com${link}`
-        const key = name.replace(/\s+/g, '').toLowerCase()
-        if (name && price > 0 && !name.includes('{{')) {
-          items.set(key, { name, price, image, url, id: key })
-        }
-      }
-    }
-    return Array.from(items.values())
-  })
-}
-
 export async function scrapeCargills(query, opts = {}) {
   const limit = opts.limit || 20
   const browser = opts.browser
@@ -54,64 +6,89 @@ export async function scrapeCargills(query, opts = {}) {
   await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' })
   const q = encodeURIComponent(query)
 
+  const allApiResponses = []
+  page.on('response', async (resp) => {
+    const url = resp.url()
+    if (url.includes('cargillsonline')) {
+      try {
+        const text = await resp.text()
+        if (text.startsWith('[') || text.startsWith('{')) {
+          try { allApiResponses.push({ url, data: JSON.parse(text) }) } catch {}
+        }
+      } catch {}
+    }
+  })
+
   try {
-    const searchUrl = `https://cargillsonline.com/Product/Search?q=${q}`
-    console.log(`  [cargills] "${query}": loading search URL...`)
-    await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 45000 })
+    console.log(`  [cargills] "${query}": loading search page...`)
+    await page.goto(`https://cargillsonline.com/Product/Search?q=${q}`, { waitUntil: 'domcontentloaded', timeout: 30000 })
     await page.waitForTimeout(3000)
 
-    let products = await extractProducts(page)
-    const cleaned = products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
-    console.log(`  [cargills] "${query}": ${products.length} total, ${cleaned.length} matching`)
+    // Set hidden field + trigger Angular
+    const injected = await page.evaluate((q) => {
+      const el = document.getElementById('txtCatSearch')
+      if (el) el.value = q
+      const ctrlEl = document.querySelector('[ng-controller="productCtrl"]')
+      if (ctrlEl && window.angular) {
+        const scope = window.angular.element(ctrlEl).scope()
+        if (scope && scope.getProductList) {
+          scope.$apply(() => scope.getProductList('-1'))
+          return 'angular_injected'
+        }
+        return 'angular_found_no_scope'
+      }
+      return window.angular ? 'no_ctrl' : 'no_angular'
+    }, query)
+    console.log(`  [cargills] "${query}": evaluate=${injected}`)
 
-    if (products.length > 0) {
-      return {
-        results: cleaned.slice(0, limit).map((p, i) => ({
-          id: `cargills:${p.id || i}`,
-          originalId: String(p.id || i),
-          name: p.name,
-          store: 'cargills',
-          storeName: 'Cargills',
-          price: p.price,
-          priceFormatted: `Rs ${p.price.toFixed(2)}`,
-          currency: 'LKR',
-          image: p.image,
-          url: p.url,
-          inStock: true,
-          category: '',
-          sku: '',
-        })),
-        total: Math.min(cleaned.length, limit),
+    await page.waitForTimeout(5000)
+
+    console.log(`  [cargills] "${query}": ${allApiResponses.length} API responses captured`)
+    for (const { url, data } of allApiResponses) {
+      const items = Array.isArray(data) ? data.length : (data && data.Data ? data.Data.length : '?')
+      console.log(`  [cargills] "${query}": API ${url.split('/').pop()} items=${items}`)
+    }
+
+    // Parse products from API responses
+    let products = []
+    for (const { url, data } of allApiResponses) {
+      const items = extractCargillsItems(data, query)
+      if (items.length > 0) {
+        products = items
+        break
       }
     }
 
-    console.log(`  [cargills] "${query}": trying homepage instead...`)
-    await page.goto('https://cargillsonline.com/', { waitUntil: 'domcontentloaded', timeout: 30000 })
-    await page.waitForTimeout(6000)
-
-    const searched = await trySearchCargills(page, query)
-    console.log(`  [cargills] "${query}": search submitted=${searched}`)
-
-    if (searched) await page.waitForTimeout(7000)
-    else await page.waitForTimeout(4000)
-
-    let results2 = await extractProducts(page)
-    console.log(`  [cargills] "${query}": homepage search => ${results2.length} products`)
-
-    if (results2.length === 0) {
-      await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
-      await page.waitForTimeout(12000)
-      results2 = await extractProducts(page)
-      console.log(`  [cargills] "${query}": retry search URL => ${results2.length} products`)
+    if (products.length === 0) {
+      console.log(`  [cargills] "${query}": API extraction gave 0, trying DOM...`)
+      await page.waitForTimeout(3000)
+      products = await page.evaluate((q) => {
+        const all = new Map()
+        const items = document.querySelectorAll('[ng-repeat*="product in DS.Data"], [class*="pro-"], .cargillProdNeed, .prdSH, [class*="product"], [class*="Product"]')
+        for (const el of items) {
+          const nameEl = el.querySelector('[class*="title"], [class*="name"], [class*="Name"], [class*="ItemName"], h3, h4, h5, p.lH22')
+          const name = nameEl?.textContent?.trim() || ''
+          const priceEl = el.querySelector('[class*="price"], [class*="Price"], .offer-price')
+          const price = parseFloat((priceEl?.textContent?.trim() || '').replace(/[^0-9.]/g, '').replace(/,/g, '')) || 0
+          const img = el.querySelector('img')
+          const image = img?.getAttribute('src') || img?.getAttribute('ng-src') || ''
+          const link = el.querySelector('a')?.getAttribute('href') || ''
+          const url = link.startsWith('http') ? link : `https://cargillsonline.com${link}`
+          const key = name.replace(/\s+/g, '').toLowerCase()
+          if (name && price > 0 && !name.includes('{{')) {
+            all.set(key, { name, price, image, url, id: key })
+          }
+        }
+        return Array.from(all.values()).filter(p => p.name.toLowerCase().includes(q.toLowerCase()))
+      }, query)
+      console.log(`  [cargills] "${query}": DOM => ${products.length}`)
     }
 
-    const finalProducts = results2.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
-
     return {
-      results: finalProducts.slice(0, limit).map((p, i) => ({
+      results: products.slice(0, limit).map((p, i) => ({
         id: `cargills:${p.id || i}`,
         originalId: String(p.id || i),
-        name: p.name,
+        name: p.name.replace(/\s+/g, ' ').trim(),
         store: 'cargills',
         storeName: 'Cargills',
         price: p.price,
@@ -123,11 +100,55 @@ export async function scrapeCargills(query, opts = {}) {
         category: '',
         sku: '',
       })),
-      total: Math.min(finalProducts.length, limit),
+      total: Math.min(products.length, limit),
     }
   } finally {
     await page.close()
   }
+}
+
+function extractCargillsItems(data, query) {
+  const results = []
+  const q = query.toLowerCase()
+  const walk = (obj) => {
+    if (!obj || typeof obj !== 'object') return
+    if (Array.isArray(obj)) {
+      for (const item of obj) walk(item)
+    } else {
+      const itemName = obj.ItemName || obj.itemName || obj.Item_Name || obj.Name || obj.name || ''
+      const price = parseFloat(obj.Price || obj.price || obj.UnitPrice || obj.SellingPrice || 0)
+      if (itemName && price > 0 && !itemName.includes('{{') && itemName.toLowerCase().includes(q)) {
+        results.push({
+          name: itemName.replace(/\s+/g, ' ').trim(),
+          price,
+          image: obj.WebImage || obj.ImageUrl || obj.image || obj.Img || '',
+          url: `https://cargillsonline.com/Product/Search?q=${encodeURIComponent(itemName)}`,
+          id: String(obj.EnId || obj.ID || obj.Id || obj.id || itemName),
+        })
+      }
+      // Also handle Data property (common in .NET APIs)
+      if (obj.Data && Array.isArray(obj.Data)) {
+        for (const sub of obj.Data) {
+          const sn = sub.ItemName || sub.itemName || sub.Name || sub.name || ''
+          const sp = parseFloat(sub.Price || sub.price || sub.UnitPrice || sub.SellingPrice || 0)
+          if (sn && sp > 0 && !sn.includes('{{') && sn.toLowerCase().includes(q)) {
+            results.push({
+              name: sn.replace(/\s+/g, ' ').trim(),
+              price: sp,
+              image: sub.WebImage || sub.ImageUrl || sub.image || '',
+              url: `https://cargillsonline.com/Product/Search?q=${encodeURIComponent(sn)}`,
+              id: String(sub.EnId || sub.ID || sub.Id || sn),
+            })
+          }
+        }
+      }
+      for (const val of Object.values(obj)) {
+        if (typeof val === 'object') walk(val)
+      }
+    }
+  }
+  walk(data)
+  return results
 }
 
 export async function createBrowser() {
