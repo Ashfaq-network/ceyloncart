@@ -190,7 +190,11 @@ const KNOWN_BRANDS = new Set([
   'nestle', 'unilever', 'dilmah', 'lipton', 'coca', 'pepsi', 'elephant', 'house',
   'fortuna', 'golden', 'crop', 'munchee', 'maliban', 'tipitip', 'kotmale', 'anchor',
   'lakspray', 'cargills', 'jayasri', 'lagro', 'rose', 'challenge', 'jayadi', 'mavee',
-  'orient', 'savemor', 'banno', 'catch', 'alli',
+  'orient', 'savemor', 'banno', 'catch', 'alli', 'serendib', 'pigeon', 'glad',
+  'lifebuoy', 'sunlight', 'vim', 'lux', 'clogard', 'signal', 'colgate',
+  'palmolive', 'dove', 'rexona', 'rin', 'surf', 'tide', 'ariel', 'omo',
+  'ambalaya', 'samaposha', 'kist', 'pure', 'crispy', 'mac', 'vanilla',
+  'roma', 'kottu', 'pandaroo', 'yumart',
 ]);
 
 const PRODUCT_TYPES = new Set([
@@ -201,7 +205,8 @@ const PRODUCT_TYPES = new Set([
   'toothpaste', 'brush', 'tissue', 'paper', 'cleaner', 'cooking',
   'string', 'hopper', 'hopper', 'bread', 'chilli', 'turmeric', 'cumin', 'pepper',
   'onion', 'potato', 'tomato', 'carrot', 'lemon', 'coconut', 'banana',
-  'noodles', 'vermicelli', 'flakes', 'mixture',
+  'noodles', 'vermicelli', 'flakes', 'mixture', 'sauce', 'pickle', 'achcharu',
+  'jam', 'honey', 'syrup', 'ketchup', 'mayonnaise', 'dressing', 'vinegar',
 ]);
 
 const RICE_VARIETIES = new Set([
@@ -314,7 +319,7 @@ function matchProducts(products) {
         else if (ratio > 2) score *= 0.75;
       }
 
-      if (score >= 0.55) {
+      if (score >= 0.45) {
         group.push(b);
         used.add(j);
       }
