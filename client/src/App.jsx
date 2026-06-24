@@ -155,8 +155,12 @@ export default function App() {
   }
 
   const handleOrder = (product) => {
-    setSelectedProduct(product)
-    setShowOrderModal(true)
+    if (product.store === 'kapruka') {
+      setSelectedProduct(product)
+      setShowOrderModal(true)
+    } else if (product.url) {
+      window.open(product.url, '_blank', 'noopener')
+    }
   }
 
   const addToGroceryList = (product) => {
