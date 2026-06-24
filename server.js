@@ -216,7 +216,6 @@ function parseQty(name) {
   let unit = m[2].replace(/s$/, '');
   if (unit === 'kg' || unit === 'kilo' || unit === 'kgs') { val *= 1000; unit = 'g'; }
   if (unit === 'litre' || unit === 'litres') { val *= 1000; unit = 'ml'; }
-  if (unit === 'kilo') { val *= 1000; unit = 'g'; }
   if (unit === 'pcs' || unit === 'pieces' || unit === 'piece') unit = 'pcs';
   if (unit === 'box') unit = 'pcs';
   if (unit === 'bag') unit = 'pcs';

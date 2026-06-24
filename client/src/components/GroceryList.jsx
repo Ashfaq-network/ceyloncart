@@ -8,7 +8,7 @@ const STORE_COLORS = {
   cargills: '#ff8f00', glomark: '#7b1fa2', arpico: '#0b2545',
 }
 const STORE_NAMES = {
-  kapruka: 'Kapruka', gfc: 'GFC', spar: 'SPAR',
+  kapruka: 'Kapruka', gfc: 'Global Food City', spar: 'SPAR',
   cargills: 'Cargills', glomark: 'Glomark', arpico: 'Arpico',
 }
 

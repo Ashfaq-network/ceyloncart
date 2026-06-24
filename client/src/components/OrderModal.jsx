@@ -11,16 +11,19 @@ export default function OrderModal({ product, onClose }) {
 
   useEffect(() => {
     if (product.store !== 'kapruka') return
+    let cancelled = false
     setCityLoading(true)
-    const timer = setTimeout(() => setCityLoading(false), 5000)
+    const timer = setTimeout(() => { if (!cancelled) setCityLoading(false) }, 5000)
     fetch('/api/cities?limit=50')
       .then(r => r.json())
       .then(data => {
+        if (cancelled) return
         const list = Array.isArray(data) ? data : data.cities || data.results || []
         setCities(Array.isArray(list) ? list : [])
       })
-      .catch(() => setCities([]))
-      .finally(() => { clearTimeout(timer); setCityLoading(false) })
+      .catch(() => { if (!cancelled) setCities([]) })
+      .finally(() => { clearTimeout(timer); if (!cancelled) setCityLoading(false) })
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [product.store])
 
   useEffect(() => {
@@ -199,7 +202,7 @@ export default function OrderModal({ product, onClose }) {
             <h3>Order Placed!</h3>
             <p>Reference: {orderResult.order_ref}</p>
             <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-              Total: Rs. {orderResult.summary?.grand_total?.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+              Total: Rs. {orderResult.summary?.grand_total ? orderResult.summary.grand_total.toLocaleString('en-LK', { minimumFractionDigits: 2 }) : '—'}
             </p>
             {orderResult.checkout_url ? (
               <>

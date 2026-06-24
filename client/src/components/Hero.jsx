@@ -2,13 +2,12 @@ import { motion } from 'framer-motion'
 import { useLang } from '../i18n'
 
 const STORES = [
-  { name: 'Kapruka', color: '#e53935' },
-  { name: 'Global Food City', color: '#1565c0' },
-  { name: 'SPAR', color: '#f9a825' },
-
-  { name: 'Cargills', color: '#ff8f00' },
-  { name: 'Glomark', color: '#7b1fa2' },
-  { name: 'Arpico', color: '#0b2545' },
+  { name: 'Kapruka', icon: '🛒', color: '#e53935' },
+  { name: 'Global Food City', icon: '🏪', color: '#1565c0' },
+  { name: 'SPAR', icon: '🛍️', color: '#f9a825' },
+  { name: 'Cargills', icon: '🏪', color: '#ff8f00' },
+  { name: 'Glomark', icon: '🛒', color: '#7b1fa2' },
+  { name: 'Arpico', icon: '🏪', color: '#0b2545' },
 ]
 
 export default function Hero({ onSearch = () => {} }) {
@@ -58,6 +57,7 @@ export default function Hero({ onSearch = () => {} }) {
               className="hero-store-badge"
               style={{ background: s.color }}
             >
+              <span className="hero-store-icon">{s.icon}</span>
               {s.name}
             </span>
           ))}
