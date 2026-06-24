@@ -1,3 +1,5 @@
+import { chromium } from 'playwright'
+
 const STEALTH_SCRIPT = () => {
   Object.defineProperty(navigator, 'webdriver', { get: () => undefined })
   Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] })

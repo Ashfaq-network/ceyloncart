@@ -1,3 +1,5 @@
+import { chromium } from 'playwright'
+
 async function trySearchCargills(page, query) {
   const searchInput = page.locator('#txtSearch')
   const count = await searchInput.count()
