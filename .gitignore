@@ -3,7 +3,9 @@ node_modules/
 cache.db
 cache.db-shm
 cache.db-wal
+*.db
 client/dist/
 dist/
 client/public/videos/
 .vercel
+.env.vercel
