@@ -527,67 +527,99 @@ function normalizeQuery(query) {
 }
 
 const HOMEPAGE_SECTIONS = {
-  featured: ['rice', 'dhal', 'coconut', 'milk', 'eggs', 'tea', 'bread', 'sugar', 'noodles', 'tinned fish'],
-  new: ['snacks', 'chocolate', 'drinks', 'biscuits', 'ice cream', 'yogurt', 'juice', 'water', 'pasta', 'cereal'],
-  bestsellers: ['dilmah', 'nestle', 'unilever', 'maggi', 'prima', 'elephant house', 'soap', 'shampoo', 'detergent', 'toothpaste'],
-  suggested: ['fruits', 'vegetables', 'chicken', 'fish', 'cheese', 'butter', 'curry', 'spices', 'sauce', 'jam'],
+  featured: ['rice', 'dhal', 'milk', 'eggs', 'bread', 'sugar'],
+  new: ['snacks', 'chocolate', 'drinks', 'biscuits', 'cereal'],
+  bestsellers: ['dilmah', 'nestle', 'maggi', 'prima', 'soap'],
+  suggested: ['fruits', 'chicken', 'cheese', 'butter', 'spices'],
 };
+
+let homepageCache = null
+let homepageBuildInProgress = false
+
+async function buildHomepage() {
+  if (homepageBuildInProgress) return
+  homepageBuildInProgress = true
+  try {
+    const result = {}
+    const globalSeen = new Set()
+    const MAX_PER_SECTION = 20
+    const MAX_PER_QUERY = 4
+
+    const sectionPromises = Object.entries(HOMEPAGE_SECTIONS).map(async ([section, queries]) => {
+      const products = []
+      const queryPromises = queries.map(q =>
+        searchAllStores(q, { limit: 6, fast: true })
+          .then(r => r.merged)
+          .catch(() => [])
+      )
+      const allResults = await Promise.allSettled(queryPromises)
+
+      for (const r of allResults) {
+        if (r.status !== 'fulfilled') continue
+        let added = 0
+        for (const p of r.value) {
+          if (added >= MAX_PER_QUERY) break
+          const key = `${p.store}-${p.originalId || p.name}`
+          if (globalSeen.has(key)) continue
+          globalSeen.add(key)
+          added++
+          products.push(p)
+          if (products.length >= MAX_PER_SECTION) break
+        }
+        if (products.length >= MAX_PER_SECTION) break
+      }
+      result[section] = products
+    })
+
+    await Promise.all(sectionPromises)
+    homepageCache = { sections: result, builtAt: Date.now() }
+
+    const db = getDb()
+    if (db) {
+      await db.execute({
+        sql: `INSERT OR REPLACE INTO cached_data (key, value, updated_at) VALUES ('homepage', ?, datetime('now'))`,
+        args: [JSON.stringify(homepageCache)],
+      }).catch(() => {})
+    }
+  } catch (e) {
+    console.error('Homepage build error:', e.message)
+  } finally {
+    homepageBuildInProgress = false
+  }
+}
 
 app.get('/api/homepage', async (req, res) => {
   try {
     const db = getDb()
+    let cached = null
     if (db) {
-      const cached = await db.execute({
-        sql: `SELECT value FROM cached_data WHERE key = 'homepage' AND updated_at > datetime('now', '-1 hour')`,
+      cached = await db.execute({
+        sql: `SELECT value, updated_at FROM cached_data WHERE key = 'homepage' AND updated_at > datetime('now', '-2 hours')`,
       }).then(r => r.rows[0])
-      if (cached) return res.json(JSON.parse(cached.value))
     }
 
-    const result = {};
-    const globalSeen = new Set();
-    const MAX_PER_SECTION = 20;
-    const MAX_PER_QUERY = 5;
-
-    const sectionPromises = Object.entries(HOMEPAGE_SECTIONS).map(async ([section, queries]) => {
-      const products = [];
-      const queryPromises = queries.map(q =>
-        searchAllStores(q, { limit: 8 })
-          .then(r => r.merged)
-          .catch(() => [])
-      );
-      const allResults = await Promise.allSettled(queryPromises);
-
-      for (const r of allResults) {
-        if (r.status !== 'fulfilled') continue;
-        let added = 0;
-        for (const p of r.value) {
-          if (added >= MAX_PER_QUERY) break;
-          const key = `${p.store}-${p.originalId || p.name}`;
-          if (globalSeen.has(key)) continue;
-          globalSeen.add(key);
-          added++;
-          products.push(p);
-          if (products.length >= MAX_PER_SECTION) break;
-        }
-        if (products.length >= MAX_PER_SECTION) break;
-      }
-      result[section] = products;
-    });
-
-    await Promise.all(sectionPromises);
-
-    if (db) {
-      try {
-        await db.execute({
-          sql: `INSERT OR REPLACE INTO cached_data (key, value, updated_at) VALUES ('homepage', ?, datetime('now'))`,
-          args: [JSON.stringify({ sections: result })],
-        })
-      } catch {}
+    if (cached) {
+      homepageCache = JSON.parse(cached.value)
+      if (!homepageCache) homepageCache = { sections: {}, builtAt: Date.now() }
+      buildHomepage()
+      return res.json(homepageCache)
     }
 
-    res.json({ sections: result });
+    if (homepageCache && homepageCache.sections && Object.keys(homepageCache.sections).length > 0) {
+      buildHomepage()
+      return res.json(homepageCache)
+    }
+
+    await buildHomepage()
+
+    if (homepageCache) {
+      res.json(homepageCache)
+    } else {
+      res.json({ sections: {} })
+    }
   } catch (e) {
-    res.json({ sections: {}, error: e.message });
+    if (homepageCache) return res.json(homepageCache)
+    res.json({ sections: {}, error: e.message })
   }
 });
 
