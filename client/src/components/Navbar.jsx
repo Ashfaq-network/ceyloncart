@@ -22,7 +22,8 @@ export default function Navbar({ categories = [], onCategorySelect = () => {}, g
     }
   }, [])
 
-  const mainCats = categories.filter(c => c.children?.length > 0).slice(0, 12)
+  const GROCERY_PARENTS = new Set(['Grocery', 'Fruits', 'Vegetables', 'Beverages', 'Chocolates', 'Snacks', 'BabyItems', 'Household'])
+  const mainCats = categories.filter(c => c.children?.length > 0 && GROCERY_PARENTS.has(c.name)).slice(0, 12)
 
   return (
     <motion.nav

@@ -80,29 +80,34 @@ function getIcon(name) {
   return '🛍️'
 }
 
+const GROCERY_CATS = [
+  'Rice', 'Fruits', 'Vegetables', 'Beverages', 'Snacks',
+  'Chocolates', 'Biscuits', 'Dairy', 'Household', 'BabyItems',
+  'Bread', 'Cooking Oil', 'Spices', 'Noodles', 'Drinks',
+  'Meat', 'Fish', 'Cheese', 'Yogurt', 'Eggs',
+]
+
 export default function CategoryBrowser({ categories = [], onSelect = () => {} }) {
   const { t } = useLang()
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, margin: '-60px' })
 
-  if (!categories || categories.length === 0) return null
-
   return (
     <div className="cat-grid" ref={ref}>
-      {categories.slice(0, 18).map((cat, i) => (
+      {GROCERY_CATS.map((name, i) => (
         <motion.button
-          key={cat.name}
+          key={name}
           className="cat-card"
-          onClick={() => onSelect(cat.name)}
+          onClick={() => onSelect(name)}
           initial={{ opacity: 0, y: 16 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.25, delay: i * 0.025 }}
           whileHover={{ y: -3 }}
           whileTap={{ scale: 0.96 }}
-          aria-label={t('category.browse') + ' ' + cat.name}
+          aria-label={t('category.browse') + ' ' + name}
         >
-          <span className="icon" aria-hidden="true">{getIcon(cat.name)}</span>
-          <span>{cat.name}</span>
+          <span className="icon" aria-hidden="true">{getIcon(name)}</span>
+          <span>{name}</span>
         </motion.button>
       ))}
     </div>
