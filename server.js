@@ -596,16 +596,7 @@ app.get('/api/search', async (req, res) => {
 
     const maxResults = parseInt(limit, 10) || 30;
     const isFast = fast === 'true'
-    let activeStores
-    if (storeFilter) {
-      activeStores = storeFilter.split(',')
-    } else if (category) {
-      activeStores = ['kapruka']
-    } else if (isFast) {
-      activeStores = null
-    } else {
-      activeStores = Object.keys(STORES)
-    }
+    const activeStores = storeFilter ? storeFilter.split(',') : (isFast ? null : Object.keys(STORES));
 
     const normalizedQuery = normalizeQuery(query);
     const sortParam = sort || '';
@@ -616,9 +607,24 @@ app.get('/api/search', async (req, res) => {
       if (cached) return res.json(cached);
     }
 
-    const { merged, matched, total } = await searchAllStores(query, {
+    let merged, matched, total;
+    const initial = await searchAllStores(query, {
       limit: maxResults, sort, cursor, category, stores: activeStores, fast: isFast,
     });
+    merged = initial.merged;
+    matched = initial.matched;
+    total = initial.total;
+
+    if (category && total < 3) {
+      const fallback = await searchAllStores(query, {
+        limit: maxResults, sort, cursor, category, stores: ['kapruka'],
+      });
+      if (fallback.total > total) {
+        merged = fallback.merged;
+        matched = fallback.matched;
+        total = fallback.total;
+      }
+    }
 
     // Record prices for history (async, non-blocking)
     const histDb = getDb();
