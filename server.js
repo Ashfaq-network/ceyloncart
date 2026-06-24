@@ -13,6 +13,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.text({ type: 'text/plain' }));
 
 // ─── Store registry ───
 const STORES = {
@@ -661,7 +662,9 @@ app.get('/api/price-history', async (req, res) => {
 // ─── Analytics ───
 app.post('/api/analytics', async (req, res) => {
   try {
-    const { type, session_id, data } = req.body || {}
+    let body = req.body
+    if (typeof body === 'string') { try { body = JSON.parse(body) } catch { body = {} } }
+    const { type, session_id, data } = body || {}
     if (!type) return res.status(400).json({ error: 'type required' })
     await recordEvent(type, session_id, data, req.ip, req.headers['user-agent'])
     res.json({ ok: true })
