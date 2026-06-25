@@ -50,8 +50,10 @@ async function ensureReady() {
       event_data TEXT,
       ip TEXT,
       user_agent TEXT,
+      country TEXT DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`)
+    try { await db.execute(`ALTER TABLE page_events ADD COLUMN country TEXT DEFAULT ''`) } catch {}
     await db.execute(`CREATE TABLE IF NOT EXISTS cached_data (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,
@@ -113,12 +115,12 @@ export async function setCachedSearch(query, stores, sort, data) {
   } catch (e) {}
 }
 
-export async function recordEvent(eventType, sessionId, data, ip, ua) {
+export async function recordEvent(eventType, sessionId, data, ip, ua, country) {
   await ensureReady()
   try {
     await db.execute({
-      sql: `INSERT INTO page_events (event_type, session_id, event_data, ip, user_agent) VALUES (?, ?, ?, ?, ?)`,
-      args: [eventType, sessionId || '', data ? JSON.stringify(data) : '', ip || '', ua || ''],
+      sql: `INSERT INTO page_events (event_type, session_id, event_data, ip, user_agent, country) VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [eventType, sessionId || '', data ? JSON.stringify(data) : '', ip || '', ua || '', country || ''],
     })
   } catch (e) {}
 }
@@ -141,12 +143,18 @@ export async function getAnalyticsSummary() {
             FROM page_events WHERE created_at > datetime('now', '-14 days')
             GROUP BY day ORDER BY day ASC`,
     }).then(r => r.rows)
+    const countries = await db.execute({
+      sql: `SELECT COALESCE(NULLIF(country, ''), 'Unknown') as country, COUNT(*) as c
+            FROM page_events WHERE event_type = 'visit'
+            GROUP BY country ORDER BY c DESC`,
+    }).then(r => r.rows)
     return {
       totalVisits: visits,
       totalSearches: searches,
       totalListsCreated: lists,
       topQueries: topQueries || [],
       dailyEvents: daily || [],
+      countries: countries || [],
     }
   } catch (e) { return {} }
 }

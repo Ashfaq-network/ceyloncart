@@ -837,7 +837,8 @@ app.post('/api/analytics', async (req, res) => {
     if (typeof body === 'string') { try { body = JSON.parse(body) } catch { body = {} } }
     const { type, session_id, data } = body || {}
     if (!type) return res.status(400).json({ error: 'type required' })
-    await recordEvent(type, session_id, data, req.ip, req.headers['user-agent'])
+    const country = req.headers['x-vercel-ip-country'] || req.headers['cf-ipcountry'] || ''
+    await recordEvent(type, session_id, data, req.ip, req.headers['user-agent'], country)
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ ok: false }) }
 })
@@ -897,6 +898,13 @@ app.get('/admin', (req, res) => {
     'html+="<div style=\\"margin-bottom:8px\\"><div style=\\"display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px\\"><span>"+day.day+"</span><span style=\\"color:#8b949e\\">"+day.c+"</span></div><div style=\\"background:#21262d;border-radius:4px;height:8px\\"><div style=\\"display:inline-block;height:8px;border-radius:4px;background:#00a86b;min-width:4px;width:"+pct+"%\\"></div></div></div>"' +
     '}}else{html+="<p style=\\"color:#8b949e;font-size:13px\\">No activity yet</p>"}' +
     'html+="</div>";' +
+    'if(d.countries&&d.countries.length){' +
+    'html+="<div class=\\"card\\"><h2>Visitors by Country</h2>";' +
+    'var maxC=Math.max.apply(null,d.countries.map(function(x){return x.c}));' +
+    'for(var i=0;i<d.countries.length;i++){' +
+    'var co=d.countries[i];var pct=Math.round(co.c/maxC*100);' +
+    'html+="<div style=\\"margin-bottom:8px\\"><div style=\\"display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px\\"><span>"+co.country+"</span><span style=\\"color:#8b949e\\">"+co.c+"</span></div><div style=\\"background:#21262d;border-radius:4px;height:8px\\"><div style=\\"display:inline-block;height:8px;border-radius:4px;background:#00a86b;min-width:4px;width:"+pct+"%\\"></div></div></div>"' +
+    '}html+="</div>"}' +
     'document.getElementById("app").innerHTML=html;' +
     '}' +
     'load();' +
