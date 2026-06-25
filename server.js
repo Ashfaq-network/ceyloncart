@@ -912,6 +912,11 @@ app.get('/admin', (req, res) => {
   )
 })
 
+// ─── YouTube Short preview page ───
+import { readFileSync } from 'fs';
+const __shortHtml = readFileSync(path.join(__dirname, 'youtube-short.html'), 'utf-8');
+app.get('/short', (req, res) => res.type('html').send(__shortHtml));
+
 // ─── Production: serve client build ───
 const clientDist = path.join(__dirname, 'dist');
 app.use(express.static(clientDist));
