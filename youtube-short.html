@@ -215,6 +215,124 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:sys
   let current = 0;
   let running = true;
 
+  // ─── Simple background music (Web Audio API) ───
+  let audioCtx, musicNodes;
+
+  function initAudio() {
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+      // Master gain
+      const master = audioCtx.createGain();
+      master.gain.setValueAtTime(0.12, audioCtx.currentTime);
+      master.connect(audioCtx.destination);
+
+      // Bass
+      const bass = audioCtx.createOscillator();
+      bass.type = 'triangle';
+      bass.frequency.setValueAtTime(130.81, audioCtx.currentTime); // C3
+      bass.frequency.setValueAtTime(146.83, audioCtx.currentTime + 1.4); // D3
+      bass.frequency.setValueAtTime(130.81, audioCtx.currentTime + 2.8);
+      bass.frequency.setValueAtTime(110.00, audioCtx.currentTime + 4.2); // A2
+      const bassGain = audioCtx.createGain();
+      bassGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      bassGain.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + 0.3);
+      bassGain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 1.2);
+      bass.connect(bassGain);
+      bassGain.connect(master);
+
+      // Pad chords
+      const pad = audioCtx.createOscillator();
+      pad.type = 'sine';
+      pad.frequency.setValueAtTime(261.63, audioCtx.currentTime); // C4
+      pad.frequency.setValueAtTime(293.66, audioCtx.currentTime + 1.4); // D4
+      pad.frequency.setValueAtTime(261.63, audioCtx.currentTime + 2.8);
+      pad.frequency.setValueAtTime(220.00, audioCtx.currentTime + 4.2); // A3
+      const padGain = audioCtx.createGain();
+      padGain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      padGain.gain.linearRampToValueAtTime(0.12, audioCtx.currentTime + 1);
+      padGain.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 2);
+      pad.connect(padGain);
+      padGain.connect(master);
+
+      // Arp melody
+      const arp = audioCtx.createOscillator();
+      arp.type = 'sine';
+      const arpNotes = [523.25, 659.25, 783.99, 659.25, 587.33, 783.99, 659.25, 523.25];
+      const arpGain = audioCtx.createGain();
+      arpGain.gain.setValueAtTime(0, audioCtx.currentTime);
+      const noteDuration = 0.35;
+      arpNotes.forEach((freq, i) => {
+        const t = audioCtx.currentTime + i * noteDuration;
+        arp.frequency.setValueAtTime(freq, t);
+        arpGain.gain.setValueAtTime(0.12, t);
+        arpGain.gain.exponentialRampToValueAtTime(0.001, t + noteDuration * 0.9);
+      });
+      arp.connect(arpGain);
+      arpGain.connect(master);
+
+      // Simple kick pattern
+      const kickDur = 0.15;
+      const kickTimes = [0, 0.5, 1.0, 1.5, 2.0, 2.5, 2.8, 3.2, 3.6, 4.0, 4.5, 5.0, 5.4, 5.8];
+      kickTimes.forEach(off => {
+        const t = audioCtx.currentTime + off;
+        const osc = audioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(150, t);
+        osc.frequency.exponentialRampToValueAtTime(30, t + kickDur);
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.4, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + kickDur);
+        osc.connect(gain);
+        gain.connect(master);
+        osc.start(t);
+        osc.stop(t + kickDur);
+      });
+
+      // Hi-hat
+      const hatTimes = [0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5, 3.75, 4.0, 4.25, 4.5, 4.75, 5.0, 5.25, 5.5, 5.75];
+      hatTimes.forEach(off => {
+        const t = audioCtx.currentTime + off;
+        const osc = audioCtx.createOscillator();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(8000, t);
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.04, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+        osc.connect(gain);
+        gain.connect(master);
+        osc.start(t);
+        osc.stop(t + 0.06);
+      });
+
+      // Start everything, loop by scheduling the loop again
+      const loopDuration = 5.6; // matches 2 cycles of 2.8s
+      bass.start(audioCtx.currentTime);
+      bass.stop(audioCtx.currentTime + loopDuration);
+      pad.start(audioCtx.currentTime);
+      pad.stop(audioCtx.currentTime + loopDuration);
+      arp.start(audioCtx.currentTime);
+      arp.stop(audioCtx.currentTime + loopDuration);
+
+      // Restart loop every cycle
+      musicNodes = setInterval(() => {
+        if (!running) return;
+        try { initAudio(); } catch(e) {}
+      }, loopDuration * 1000 - 100);
+    } catch(e) {}
+  }
+
+  // ─── Tap to start overlay ───
+  const overlay = document.createElement('div');
+  overlay.innerHTML = '<span style="position:fixed;inset:0;z-index:100;background:#000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;cursor:pointer"><div style="font-size:2rem">&#x1F3B5;</div><div style="color:#555;font-size:.9rem">Tap to start</div></span>';
+  document.body.appendChild(overlay.firstElementChild);
+  overlay.firstElementChild.addEventListener('click', function(){
+    this.style.opacity = '0';
+    this.style.transition = 'opacity 0.5s';
+    setTimeout(() => this.remove(), 500);
+    initAudio();
+  });
+
   function update(index) {
     scenes.forEach((s,i)=>s.classList.toggle('active',i===index));
     segs.forEach((seg,i)=>{
