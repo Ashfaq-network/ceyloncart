@@ -844,7 +844,7 @@ app.post('/api/analytics', async (req, res) => {
 })
 
 app.get('/api/analytics/dashboard', async (req, res) => {
-  try { res.json(await getAnalyticsSummary()) } catch (e) { res.json({}) }
+  try { res.json(await getAnalyticsSummary(req.query.exclude_ip)) } catch (e) { res.json({}) }
 })
 
 app.get('/api/store-health', async (req, res) => {
@@ -874,14 +874,18 @@ app.get('/admin', (req, res) => {
     '<h1>GroceryLK</h1><p class="sub">Analytics Dashboard</p>' +
     '<div id="app"><p style="text-align:center;padding:60px;color:#8b949e;font-size:14px">Loading...</p></div>' +
     '<script>' +
-    'async function load(){' +
-    'var r=await fetch("/api/analytics/dashboard");' +
-    'var d=await r.json();' +
+    'var myIp=localStorage.getItem("myip")||"";' +
+    'function fetchData(){' +
+    'var url="/api/analytics/dashboard";' +
+    'if(myIp)url+="?exclude_ip="+encodeURIComponent(myIp);' +
+    'fetch(url).then(function(r){return r.json()}).then(function(d){' +
     'var maxQ=d.topQueries&&d.topQueries.length?Math.max.apply(null,d.topQueries.map(function(x){return x.c})):1;' +
-    'var maxD=d.dailyEvents&&d.dailyEvents.length?Math.max.apply(null,d.dailyEvents.map(function(x){return x.c})):1;' +
+    'var maxU=d.dailyUnique&&d.dailyUnique.length?Math.max.apply(null,d.dailyUnique.map(function(x){return x.c})):1;' +
     'var html=' +
+    '"<div style=\\"margin-bottom:20px;display:flex;gap:8px;align-items:center;flex-wrap:wrap\\"><span style=\\"font-size:12px;color:#8b949e\\">Your IP:</span><input id=\\"ipInput\\" value=\\""+myIp+"\\" style=\\"padding:6px 10px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:13px;width:160px\\" placeholder=\\"Enter your IP\\"/><button onclick=\\"saveIp()\\" style=\\"padding:6px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:12px;cursor:pointer\\">Exclude me</button><span style=\\"font-size:11px;color:#555\\">(reloads chart)</span></div>" +' +
     '"<div class=\\"card\\"><div class=\\"stats\\">" +' +
-    '"<div class=\\"stat\\"><div class=\\"stat-value\\">"+d.totalVisits+"</div><div class=\\"stat-label\\">Visits</div></div>" +' +
+    '"<div class=\\"stat\\"><div class=\\"stat-value\\">"+d.totalVisits+"</div><div class=\\"stat-label\\">Total Visitors</div></div>" +' +
+    '"<div class=\\"stat\\"><div class=\\"stat-value\\">"+d.yesterdayVisitors+"</div><div class=\\"stat-label\\">Yesterday Visitors</div></div>" +' +
     '"<div class=\\"stat\\"><div class=\\"stat-value\\">"+d.totalSearches+"</div><div class=\\"stat-label\\">Searches</div></div>" +' +
     '"<div class=\\"stat\\"><div class=\\"stat-value\\">"+d.totalListsCreated+"</div><div class=\\"stat-label\\">Lists Created</div></div>" +' +
     '"</div></div>" +' +
@@ -891,10 +895,10 @@ app.get('/admin', (req, res) => {
     'var q=d.topQueries[i];var pct=Math.round(q.c/maxQ*100);' +
     'html+="<div style=\\"margin-bottom:10px\\"><div style=\\"display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px\\"><span>"+(q.q||"(empty)")+"</span><span style=\\"color:#8b949e\\">"+q.c+"</span></div><div style=\\"background:#21262d;border-radius:4px;height:8px\\"><div style=\\"display:inline-block;height:8px;border-radius:4px;background:#00a86b;min-width:4px;width:"+pct+"%\\"></div></div></div>"' +
     '}}else{html+="<p style=\\"color:#8b949e;font-size:13px\\">No searches yet</p>"}' +
-    'html+="</div><div class=\\"card\\"><h2>Daily Activity (last 14 days)</h2>";' +
-    'if(d.dailyEvents&&d.dailyEvents.length){' +
-    'for(var i=0;i<d.dailyEvents.length;i++){' +
-    'var day=d.dailyEvents[i];var pct=Math.round(day.c/maxD*100);' +
+    'html+="</div><div class=\\"card\\"><h2>Unique Visitors / Day (last 14 days)</h2>";' +
+    'if(d.dailyUnique&&d.dailyUnique.length){' +
+    'for(var i=0;i<d.dailyUnique.length;i++){' +
+    'var day=d.dailyUnique[i];var pct=Math.round(day.c/maxU*100);' +
     'html+="<div style=\\"margin-bottom:8px\\"><div style=\\"display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px\\"><span>"+day.day+"</span><span style=\\"color:#8b949e\\">"+day.c+"</span></div><div style=\\"background:#21262d;border-radius:4px;height:8px\\"><div style=\\"display:inline-block;height:8px;border-radius:4px;background:#00a86b;min-width:4px;width:"+pct+"%\\"></div></div></div>"' +
     '}}else{html+="<p style=\\"color:#8b949e;font-size:13px\\">No activity yet</p>"}' +
     'html+="</div>";' +
@@ -906,8 +910,10 @@ app.get('/admin', (req, res) => {
     'html+="<div style=\\"margin-bottom:8px\\"><div style=\\"display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px\\"><span>"+co.country+"</span><span style=\\"color:#8b949e\\">"+co.c+"</span></div><div style=\\"background:#21262d;border-radius:4px;height:8px\\"><div style=\\"display:inline-block;height:8px;border-radius:4px;background:#00a86b;min-width:4px;width:"+pct+"%\\"></div></div></div>"' +
     '}html+="</div>"}' +
     'document.getElementById("app").innerHTML=html;' +
+    '}).catch(function(){document.getElementById("app").innerHTML="<p style=\\"text-align:center;padding:60px;color:#8b949e;font-size:14px\\">Error loading data</p>"})' +
     '}' +
-    'load();' +
+    'function saveIp(){myIp=document.getElementById("ipInput").value;localStorage.setItem("myip",myIp);fetchData()}' +
+    'fetchData();' +
     '</script></body></html>'
   )
 })

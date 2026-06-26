@@ -125,35 +125,47 @@ export async function recordEvent(eventType, sessionId, data, ip, ua, country) {
   } catch (e) {}
 }
 
-export async function getAnalyticsSummary() {
+export async function getAnalyticsSummary(excludeIp) {
   await ensureReady()
+  const ipFilter = excludeIp ? `AND ip != '${excludeIp.replace(/'/g, "''")}'` : ''
   try {
     const [visits, searches, lists] = await Promise.all([
-      db.execute({ sql: `SELECT COUNT(DISTINCT session_id) as c FROM page_events WHERE event_type = 'visit'` }).then(r => r.rows[0]?.c || 0),
-      db.execute({ sql: `SELECT COUNT(*) as c FROM page_events WHERE event_type = 'search'` }).then(r => r.rows[0]?.c || 0),
+      db.execute({ sql: `SELECT COUNT(DISTINCT session_id) as c FROM page_events WHERE event_type = 'visit' ${ipFilter}` }).then(r => r.rows[0]?.c || 0),
+      db.execute({ sql: `SELECT COUNT(*) as c FROM page_events WHERE event_type = 'search' ${ipFilter}` }).then(r => r.rows[0]?.c || 0),
       db.execute({ sql: `SELECT COUNT(*) as c FROM page_events WHERE event_type = 'add_to_list'` }).then(r => r.rows[0]?.c || 0),
     ])
     const topQueries = await db.execute({
       sql: `SELECT json_extract(event_data, '$.query') as q, COUNT(*) as c
-            FROM page_events WHERE event_type = 'search' AND event_data IS NOT NULL
+            FROM page_events WHERE event_type = 'search' AND event_data IS NOT NULL ${ipFilter}
             GROUP BY q ORDER BY c DESC LIMIT 10`,
     }).then(r => r.rows)
     const daily = await db.execute({
       sql: `SELECT date(created_at) as day, COUNT(*) as c
-            FROM page_events WHERE created_at > datetime('now', '-14 days')
+            FROM page_events WHERE created_at > datetime('now', '-14 days') ${ipFilter}
+            GROUP BY day ORDER BY day ASC`,
+    }).then(r => r.rows)
+    const dailyUnique = await db.execute({
+      sql: `SELECT date(created_at) as day, COUNT(DISTINCT session_id) as c
+            FROM page_events WHERE created_at > datetime('now', '-14 days') AND event_type = 'visit' ${ipFilter}
             GROUP BY day ORDER BY day ASC`,
     }).then(r => r.rows)
     const countries = await db.execute({
       sql: `SELECT COALESCE(NULLIF(country, ''), 'Unknown') as country, COUNT(*) as c
-            FROM page_events WHERE event_type = 'visit'
+            FROM page_events WHERE event_type = 'visit' ${ipFilter}
             GROUP BY country ORDER BY c DESC`,
     }).then(r => r.rows)
+    const yesterday = await db.execute({
+      sql: `SELECT COUNT(DISTINCT session_id) as c FROM page_events
+            WHERE event_type = 'visit' AND date(created_at) = date('now', '-1 day') ${ipFilter}`,
+    }).then(r => r.rows[0]?.c || 0)
     return {
       totalVisits: visits,
       totalSearches: searches,
       totalListsCreated: lists,
       topQueries: topQueries || [],
       dailyEvents: daily || [],
+      dailyUnique: dailyUnique || [],
+      yesterdayVisitors: yesterday,
       countries: countries || [],
     }
   } catch (e) { return {} }
