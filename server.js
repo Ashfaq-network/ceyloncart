@@ -1092,6 +1092,11 @@ import { readFileSync } from 'fs';
 const __shortHtml = readFileSync(path.join(__dirname, 'youtube-short.html'), 'utf-8');
 app.get('/short', (req, res) => res.type('html').send(__shortHtml));
 
+// ─── Promo video ───
+app.get('/promo.mp4', (req, res) => {
+  res.sendFile(path.join(__dirname, 'promo.mp4'));
+});
+
 // ─── Production: serve client build ───
 const clientDist = path.join(__dirname, 'dist');
 app.use(express.static(clientDist));
