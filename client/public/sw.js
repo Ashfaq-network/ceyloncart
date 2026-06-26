@@ -1,5 +1,5 @@
-const CACHE_NAME = 'grocerylk-v2'
-const STATIC_CACHE = 'grocerylk-static-v2'
+const CACHE_NAME = 'grocerylk-v4'
+const STATIC_CACHE = 'grocerylk-static-v4'
 
 self.addEventListener('install', () => {
   self.skipWaiting()

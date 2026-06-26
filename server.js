@@ -855,6 +855,8 @@ app.get('/api/store-health', async (req, res) => {
 })
 
 // ─── Admin dashboard page ───
+app.get('/api/myip', (req, res) => res.json({ ip: req.ip }));
+
 app.get('/admin', (req, res) => {
   res.type('html').send(
     '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">' +
@@ -875,6 +877,8 @@ app.get('/admin', (req, res) => {
     '<div id="app"><p style="text-align:center;padding:60px;color:#8b949e;font-size:14px">Loading...</p></div>' +
     '<script>' +
     'var myIp=localStorage.getItem("myip")||"";' +
+    'if(!myIp){fetch("/api/myip").then(function(r){return r.json()}).then(function(d){myIp=d.ip;loadData()}).catch(function(){loadData()})}else{loadData()}' +
+    'function loadData(){fetchData()}' +
     'function fetchData(){' +
     'var url="/api/analytics/dashboard";' +
     'if(myIp)url+="?exclude_ip="+encodeURIComponent(myIp);' +
@@ -913,7 +917,6 @@ app.get('/admin', (req, res) => {
     '}).catch(function(){document.getElementById("app").innerHTML="<p style=\\"text-align:center;padding:60px;color:#8b949e;font-size:14px\\">Error loading data</p>"})' +
     '}' +
     'function saveIp(){localStorage.setItem("myip",document.getElementById("ipInput").value);location.reload()}' +
-    'fetchData();' +
     '</script></body></html>'
   )
 })
