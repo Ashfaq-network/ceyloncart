@@ -35,6 +35,11 @@ function ProductImage({ product }) {
   )
 }
 
+function shareProduct(product) {
+  const text = `🛒 ${product.name}\n🏪 ${product.storeName}: ${product.priceFormatted}\n\nCheck prices across 6 stores → https://grocerylk.vercel.app/?q=${encodeURIComponent(product.name.split(' - ')[0] || product.name)}`
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+}
+
 export default function ProductGrid({ products = [], onOrder = () => {}, onAddToList = () => {} }) {
   const { t } = useLang()
   if (!products || products.length === 0) return null
@@ -83,6 +88,9 @@ export default function ProductGrid({ products = [], onOrder = () => {}, onAddTo
               {t('product.addToList')}
             </button>
           </div>
+          <button className="product-share-btn" onClick={() => shareProduct(product)} aria-label="Share on WhatsApp">
+            📤
+          </button>
         </motion.div>
       ))}
     </div>

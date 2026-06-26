@@ -32,6 +32,11 @@ function ProductImage({ product, className = 'comp-img', fallbackClass = 'comp-i
   )
 }
 
+function shareProduct(product) {
+  const text = `🛒 ${product.name}\n🏪 ${product.storeName}: ${product.priceFormatted}\n\nCheck prices across 6 stores → https://grocerylk.vercel.app/?q=${encodeURIComponent((product.name || '').split(' - ')[0] || product.name)}`
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+}
+
 function StoreCell({ product, isBest, onOrder, onAddToList }) {
   const { t } = useLang()
   const color = STORE_COLORS[product.store] || '#555'
@@ -57,6 +62,7 @@ function StoreCell({ product, isBest, onOrder, onAddToList }) {
       >
         {t('product.addToList')}
       </button>
+      <button className="store-cell-share" onClick={() => shareProduct(product)} aria-label="Share on WhatsApp">📤</button>
     </div>
   )
 }
@@ -258,6 +264,7 @@ export default function ComparisonGrid({ results = [], matched = [], onOrder = (
                   >
                     {t('product.addToList')}
                   </button>
+                  <button className="product-share-btn" onClick={() => shareProduct(product)} aria-label="Share on WhatsApp">📤</button>
                 </div>
               </motion.div>
             ))}

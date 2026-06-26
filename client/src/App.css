@@ -737,6 +737,7 @@ input { font-family: inherit; outline: none; }
   display: flex;
   flex-direction: column;
   gap: 8px;
+  position: relative;
 }
 
 .product-card:hover {
@@ -1041,6 +1042,31 @@ input { font-family: inherit; outline: none; }
   transition: background 0.2s;
 }
 .add-list-btn:hover { background: #008f5a; }
+.product-share-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px;
+  line-height: 1;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+.product-share-btn:hover { opacity: 1; }
+.store-cell-share {
+  background: none;
+  border: none;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px;
+  line-height: 1;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+.store-cell-share:hover { opacity: 1; }
 .nav-badge {
   display: inline-flex;
   align-items: center;
