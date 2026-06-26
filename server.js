@@ -869,6 +869,10 @@ app.get('/admin', (req, res) => {
     '.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;margin-bottom:16px}' +
     '.card h2{font-size:14px;text-transform:uppercase;letter-spacing:1px;color:#8b949e;margin-bottom:12px}' +
     '.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}' +
+    '.big-stat{text-align:center;padding:24px;background:#0d1117;border:2px solid #00a86b;border-radius:8px;margin-bottom:16px}' +
+    '.big-stat-value{font-size:48px;font-weight:700;color:#00a86b}' +
+    '.big-stat-label{font-size:13px;color:#8b949e;margin-top:4px;text-transform:uppercase;letter-spacing:1px}' +
+
     '.stat{text-align:center;padding:16px;background:#0d1117;border:1px solid #30363d;border-radius:6px}' +
     '.stat-value{font-size:28px;font-weight:700;color:#f0f6fc}' +
     '.stat-label{font-size:11px;color:#8b949e;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px}' +
@@ -887,11 +891,11 @@ app.get('/admin', (req, res) => {
     'var maxU=d.dailyUnique&&d.dailyUnique.length?Math.max.apply(null,d.dailyUnique.map(function(x){return x.c})):1;' +
     'var html=' +
     '"<div style=\\"margin-bottom:20px;display:flex;gap:8px;align-items:center;flex-wrap:wrap\\"><span style=\\"font-size:12px;color:#8b949e\\">Your IP:</span><input id=\\"ipInput\\" value=\\""+myIp+"\\" style=\\"padding:6px 10px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:13px;width:160px\\" placeholder=\\"Enter your IP\\"/><button onclick=\\"saveIp()\\" style=\\"padding:6px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:12px;cursor:pointer\\">Exclude me</button><span style=\\"font-size:11px;color:#555\\">(reloads chart)</span></div>" +' +
+    '"<div class=\\"big-stat\\"><div class=\\"big-stat-value\\">"+d.todayVisitors+"</div><div class=\\"big-stat-label\\">Real People Today</div></div>" +' +
     '"<div class=\\"card\\"><div class=\\"stats\\">" +' +
-    '"<div class=\\"stat\\"><div class=\\"stat-value\\">"+d.totalVisits+"</div><div class=\\"stat-label\\">Total Visitors</div></div>" +' +
-    '"<div class=\\"stat\\"><div class=\\"stat-value\\">"+d.yesterdayVisitors+"</div><div class=\\"stat-label\\">Yesterday Visitors</div></div>" +' +
+    '"<div class=\\"stat\\"><div class=\\"stat-value\\">"+d.totalVisits+"</div><div class=\\"stat-label\\">Total All Time</div></div>" +' +
+    '"<div class=\\"stat\\"><div class=\\"stat-value\\">"+d.yesterdayVisitors+"</div><div class=\\"stat-label\\">Yesterday</div></div>" +' +
     '"<div class=\\"stat\\"><div class=\\"stat-value\\">"+d.totalSearches+"</div><div class=\\"stat-label\\">Searches</div></div>" +' +
-    '"<div class=\\"stat\\"><div class=\\"stat-value\\">"+d.totalListsCreated+"</div><div class=\\"stat-label\\">Lists Created</div></div>" +' +
     '"</div></div>" +' +
     '"<div class=\\"card\\"><h2>Top Searches</h2>";' +
     'if(d.topQueries&&d.topQueries.length){' +
@@ -909,10 +913,13 @@ app.get('/admin', (req, res) => {
     'if(d.countries&&d.countries.length){' +
     'html+="<div class=\\"card\\"><h2>Visitors by Country</h2>";' +
     'var maxC=Math.max.apply(null,d.countries.map(function(x){return x.c}));' +
+    'var flags={LK:"🇱🇰",US:"🇺🇸",GB:"🇬🇧",CA:"🇨🇦",AU:"🇦🇺",IN:"🇮🇳",AE:"🇦🇪",SA:"🇸🇦",JP:"🇯🇵",DE:"🇩🇪",FR:"🇫🇷"};' +
     'for(var i=0;i<d.countries.length;i++){' +
     'var co=d.countries[i];var pct=Math.round(co.c/maxC*100);' +
-    'html+="<div style=\\"margin-bottom:8px\\"><div style=\\"display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px\\"><span>"+co.country+"</span><span style=\\"color:#8b949e\\">"+co.c+"</span></div><div style=\\"background:#21262d;border-radius:4px;height:8px\\"><div style=\\"display:inline-block;height:8px;border-radius:4px;background:#00a86b;min-width:4px;width:"+pct+"%\\"></div></div></div>"' +
+    'var flag=flags[co.country]||"";' +
+    'html+="<div style=\\"margin-bottom:8px\\"><div style=\\"display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px\\"><span>"+flag+" "+co.country+"</span><span style=\\"color:#8b949e\\">"+co.c+"</span></div><div style=\\"background:#21262d;border-radius:4px;height:8px\\"><div style=\\"display:inline-block;height:8px;border-radius:4px;background:#00a86b;min-width:4px;width:"+pct+"%\\"></div></div></div>"' +
     '}html+="</div>"}' +
+    'if(d.todayVisitors===0&&d.totalVisits===0){html="<div class=\\"big-stat\\" style=\\"border-color:#ff6b6b\\"><div class=\\"big-stat-value\\" style=\\"color:#ff6b6b;font-size:32px\\">No visitors yet</div><div class=\\"big-stat-label\\">Share the site to get traffic!</div></div>"}' +
     'document.getElementById("app").innerHTML=html;' +
     '}).catch(function(){document.getElementById("app").innerHTML="<p style=\\"text-align:center;padding:60px;color:#8b949e;font-size:14px\\">Error loading data</p>"})' +
     '}' +

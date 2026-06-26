@@ -158,14 +158,19 @@ export async function getAnalyticsSummary(excludeIp) {
       sql: `SELECT COUNT(DISTINCT session_id) as c FROM page_events
             WHERE event_type = 'visit' AND date(created_at) = date('now', '-1 day') ${ipFilter}`,
     }).then(r => r.rows[0]?.c || 0)
+    const today = await db.execute({
+      sql: `SELECT COUNT(DISTINCT session_id) as c FROM page_events
+            WHERE event_type = 'visit' AND date(created_at) = date('now') ${ipFilter}`,
+    }).then(r => r.rows[0]?.c || 0)
     return {
       totalVisits: visits,
       totalSearches: searches,
       totalListsCreated: lists,
+      todayVisitors: today,
+      yesterdayVisitors: yesterday,
       topQueries: topQueries || [],
       dailyEvents: daily || [],
       dailyUnique: dailyUnique || [],
-      yesterdayVisitors: yesterday,
       countries: countries || [],
     }
   } catch (e) { return {} }
