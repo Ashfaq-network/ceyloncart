@@ -912,7 +912,7 @@ app.get('/admin', (req, res) => {
     'document.getElementById("app").innerHTML=html;' +
     '}).catch(function(){document.getElementById("app").innerHTML="<p style=\\"text-align:center;padding:60px;color:#8b949e;font-size:14px\\">Error loading data</p>"})' +
     '}' +
-    'function saveIp(){myIp=document.getElementById("ipInput").value;localStorage.setItem("myip",myIp);fetchData()}' +
+    'function saveIp(){localStorage.setItem("myip",document.getElementById("ipInput").value);location.reload()}' +
     'fetchData();' +
     '</script></body></html>'
   )
