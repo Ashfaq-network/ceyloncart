@@ -918,7 +918,146 @@ app.get('/admin', (req, res) => {
   )
 })
 
-// ─── YouTube Short preview page ───
+// ─── SEO product pages ───
+const SEO_PAGES = [
+  { slug: 'rice-price-sri-lanka', query: 'rice', name: 'Rice', desc: 'Compare rice prices across Sri Lankan stores. Find the best deal on nike rice, basmati, samba, and more.' },
+  { slug: 'dhal-price-sri-lanka', query: 'dhal', name: 'Dhal', desc: 'Compare dhal (parippu) prices in Sri Lanka. Find the cheapest red dhal, green gram, and lentils across stores.' },
+  { slug: 'milk-powder-price-sri-lanka', query: 'milk powder', name: 'Milk Powder', desc: 'Compare milk powder prices in Sri Lanka. Find the best deal on Anchor, Ratthi, Nespray, and更多 brands.' },
+  { slug: 'eggs-price-sri-lanka', query: 'eggs', name: 'Eggs', desc: 'Compare egg prices across Sri Lankan stores. Find the cheapest tray of eggs near you.' },
+  { slug: 'sugar-price-sri-lanka', query: 'sugar', name: 'Sugar', desc: 'Compare sugar prices in Sri Lanka. Find the best deal on white sugar, brown sugar, and more.' },
+  { slug: 'bread-price-sri-lanka', query: 'bread', name: 'Bread', desc: 'Compare bread prices across Sri Lankan stores. Find sandwich bread, whole wheat, and more.' },
+  { slug: 'chicken-price-sri-lanka', query: 'chicken', name: 'Chicken', desc: 'Compare chicken prices in Sri Lanka. Find the best deal on fresh chicken, whole chicken, and cuts.' },
+  { slug: 'soap-price-sri-lanka', query: 'soap', name: 'Soap', desc: 'Compare soap and bath product prices in Sri Lanka. Find Lux, Lifebuoy, Dettol, and more.' },
+  { slug: 'biscuits-price-sri-lanka', query: 'biscuits', name: 'Biscuits', desc: 'Compare biscuit prices across Sri Lankan stores. Find Maliban, Munchee, and more brands.' },
+  { slug: 'tea-price-sri-lanka', query: 'tea', name: 'Tea', desc: 'Compare tea prices in Sri Lanka. Find Dilmah, Lipton, Zesta, and Ceylon tea at the best price.' },
+]
+
+app.get('/p/:slug', async (req, res) => {
+  const page = SEO_PAGES.find(p => p.slug === req.params.slug)
+  if (!page) return res.redirect('/')
+
+  try {
+    const data = await searchAllStores(page.query, { limit: 10, fast: true })
+    const items = data.merged || []
+    const cheapest = items.filter(p => p.price).sort((a, b) => a.price - b.price)[0]
+    const currency = 'LKR'
+
+    let resultsHtml = ''
+    if (items.length === 0) {
+      resultsHtml = '<p style="text-align:center;padding:40px;color:#666">No prices found at the moment. Try again later.</p>'
+    } else {
+      const seen = new Set()
+      resultsHtml = items.filter(p => { if (seen.has(p.store)) return false; seen.add(p.store); return true }).map(p => {
+        const isBest = cheapest && p.store === cheapest.store && p.price === cheapest.price
+        return `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#0d1117;border-radius:10px;border:1px solid #21262d;${isBest ? 'border-color:#00a86b' : ''}">
+            <div>
+              <div style="font-size:13px;color:#c9d1d9;font-weight:500">${p.storeName || p.store}</div>
+              <div style="font-size:11px;color:#555;margin-top:2px">${p.name.length > 50 ? p.name.slice(0, 50) + '...' : p.name}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:18px;font-weight:700;color:${isBest ? '#00a86b' : '#f0f6fc'}">${p.priceFormatted || `Rs ${p.price?.toLocaleString() || 'N/A'}`}</div>
+              ${isBest ? '<div style="font-size:10px;color:#00a86b;font-weight:600;margin-top:2px">BEST PRICE</div>' : ''}
+            </div>
+          </div>
+        `
+      }).join('')
+    }
+
+    const jsonld = {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: `${page.name} Price Comparison - Sri Lanka`,
+      description: page.desc,
+      offers: items.filter(p => p.price).map(p => ({
+        '@type': 'Offer',
+        price: p.price,
+        priceCurrency: currency,
+        seller: { '@type': 'Organization', name: p.storeName || p.store },
+        url: p.url || 'https://grocerylk.vercel.app/',
+        availability: p.inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      })),
+    }
+
+    res.type('html').send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>${page.name} Price in Sri Lanka 2026 | Compare Across Stores | GroceryLK</title>
+<meta name="description" content="${page.desc} Check prices at Kapruka, Cargills, SPAR, Glomark, Arpico &amp; GFC.">
+<link rel="canonical" href="https://grocerylk.vercel.app/p/${page.slug}">
+<meta name="robots" content="index, follow">
+<meta property="og:title" content="${page.name} Price in Sri Lanka | GroceryLK">
+<meta property="og:description" content="${page.desc}">
+<meta property="og:url" content="https://grocerylk.vercel.app/p/${page.slug}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="GroceryLK">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${page.name} Price in Sri Lanka | GroceryLK">
+<meta name="twitter:description" content="${page.desc}">
+<script type="application/ld+json">${JSON.stringify(jsonld)}</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0d1117;color:#c9d1d9;padding:0}
+.header{background:#161b22;border-bottom:1px solid #30363d;padding:20px 24px;text-align:center}
+.header h1{font-size:22px;color:#f0f6fc;margin-bottom:4px}
+.header .sub{font-size:13px;color:#8b949e}
+.header .logo-link{color:#00a86b;text-decoration:none;font-weight:700;font-size:14px;display:inline-block;margin-top:10px}
+.container{max-width:600px;margin:0 auto;padding:24px 16px}
+.breadcrumb{font-size:12px;color:#555;margin-bottom:20px}
+.breadcrumb a{color:#8b949e;text-decoration:none}
+.breadcrumb a:hover{color:#00a86b}
+.breadcrumb span{color:#555}
+.results{display:flex;flex-direction:column;gap:10px}
+.cta{text-align:center;margin-top:32px;padding:24px;background:#161b22;border-radius:12px;border:1px solid #30363d}
+.cta p{font-size:14px;color:#8b949e;margin-bottom:12px}
+.cta a{display:inline-block;padding:10px 24px;background:#00a86b;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px}
+.cta a:hover{background:#00c853}
+.stores{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}
+.stores span{padding:4px 10px;background:#21262d;border-radius:4px;font-size:11px;color:#8b949e;border:1px solid #30363d}
+.footer{text-align:center;padding:24px;font-size:12px;color:#555;border-top:1px solid #21262d;margin-top:40px}
+.footer a{color:#8b949e;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>${page.name} Price in Sri Lanka</h1>
+  <div class="sub">Compare prices across Kapruka, Cargills, SPAR, Glomark, Arpico &amp; GFC</div>
+  <a class="logo-link" href="/">&#8592; GroceryLK Home</a>
+</div>
+<div class="container">
+  <div class="breadcrumb"><a href="/">Home</a> <span>/</span> <span>${page.name}</span></div>
+
+  <p style="font-size:14px;color:#8b949e;margin-bottom:20px;line-height:1.6">${page.desc} Prices updated in real-time from all major Sri Lankan grocery stores.</p>
+
+  <div class="results">${resultsHtml}</div>
+
+  <div class="cta">
+    <p>Search for any grocery item across all 6 stores</p>
+    <a href="/?q=${encodeURIComponent(page.query)}">Search "${page.query}" on GroceryLK &#8594;</a>
+    <div class="stores">
+      <span>Kapruka</span><span>Cargills</span><span>SPAR</span><span>Glomark</span><span>Arpico</span><span>GFC</span>
+    </div>
+  </div>
+</div>
+<div class="footer">
+  <p>&copy; 2026 <a href="/">GroceryLK</a> &mdash; Sri Lanka Grocery Price Comparison</p>
+</div>
+</body>
+</html>`)
+  } catch (e) {
+    res.redirect('/')
+  }
+})
+app.get('/sitemap.xml', (req, res) => {
+  const urls = SEO_PAGES.map(p => `  <url><loc>https://grocerylk.vercel.app/p/${p.slug}</loc><priority>0.8</priority></url>`).join('\n')
+  res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://grocerylk.vercel.app/</loc><priority>1.0</priority></url>
+${urls}
+</urlset>`)
+})
 import { readFileSync } from 'fs';
 const __shortHtml = readFileSync(path.join(__dirname, 'youtube-short.html'), 'utf-8');
 app.get('/short', (req, res) => res.type('html').send(__shortHtml));
