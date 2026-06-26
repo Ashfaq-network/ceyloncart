@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useLang } from '../i18n'
 import { track } from '../analytics'
+import { apiFetch } from '../api'
 
 function WaIcon({ size = 14 }) {
   return (
@@ -81,7 +82,7 @@ function usePriceTrend(product) {
   useEffect(() => {
     if (!product) return
     const key = `${product.store}:${product.originalId || product.id}`
-    fetch(`/api/price-history?product_key=${encodeURIComponent(key)}&days=14`)
+    apiFetch(`/api/price-history?product_key=${encodeURIComponent(key)}&days=14`)
       .then(r => r.json())
       .then(data => {
         const h = data?.history

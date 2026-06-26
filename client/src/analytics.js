@@ -11,13 +11,14 @@ function getSession() {
 export function track(type, data = {}) {
   try {
     const payload = { type, session_id: getSession(), data }
+    const body = JSON.stringify(payload)
     if (navigator.sendBeacon) {
-      navigator.sendBeacon('/api/analytics', new Blob([JSON.stringify(payload)], { type: 'application/json' }))
+      navigator.sendBeacon('/api/analytics', new Blob([body], { type: 'application/json' }))
     } else {
       fetch('/api/analytics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body,
       })
     }
   } catch (_) {}

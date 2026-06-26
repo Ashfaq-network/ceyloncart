@@ -10,6 +10,7 @@ import OrderModal from './components/OrderModal'
 import GroceryList from './components/GroceryList'
 import Footer from './components/Footer'
 import { track } from './analytics'
+import { apiFetch } from './api'
 import './App.css'
 
 const STORE_COLORS = {
@@ -53,18 +54,18 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/categories?depth=2')
+    apiFetch('/api/categories?depth=2')
       .then(r => r.json())
       .then(d => setCategories(d.categories || []))
       .catch(() => {})
-    fetch('/api/stores')
+    apiFetch('/api/stores')
       .then(r => r.json())
       .then(d => {
         setStores(d.stores || [])
         setActiveStores((d.stores || []).map(s => s.id))
       })
       .catch(() => {})
-    fetch('/api/homepage')
+    apiFetch('/api/homepage')
       .then(r => r.json())
       .then(d => {
         const s = d.sections || {}
@@ -92,7 +93,7 @@ export default function App() {
         params.set('stores', filterStores)
       }
       // When no stores param is sent, server auto-selects based on health tracking
-      const res = await fetch(`/api/search?${params}`)
+      const res = await apiFetch(`/api/search?${params}`)
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setRawData(data)

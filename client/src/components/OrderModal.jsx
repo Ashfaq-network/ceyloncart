@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useLang } from '../i18n'
+import { apiFetch } from '../api'
 
 export default function OrderModal({ product, onClose }) {
   const { t } = useLang()
@@ -14,7 +15,7 @@ export default function OrderModal({ product, onClose }) {
     let cancelled = false
     setCityLoading(true)
     const timer = setTimeout(() => { if (!cancelled) setCityLoading(false) }, 5000)
-    fetch('/api/cities?limit=50')
+    apiFetch('/api/cities?limit=50')
       .then(r => r.json())
       .then(data => {
         if (cancelled) return
@@ -56,7 +57,7 @@ export default function OrderModal({ product, onClose }) {
     setErrorMsg('')
 
     try {
-      const res = await fetch('/api/create-order', {
+      const res = await apiFetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

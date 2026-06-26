@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import rateLimit from 'express-rate-limit';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { getDb, initDb, getCachedSearch, setCachedSearch, getCacheStats, recordEvent, getAnalyticsSummary, getCachedCategory, setCachedCategory } from './db.js';
@@ -27,10 +28,63 @@ async function getScrapedResults(store, query) {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const API_KEY = process.env.API_KEY || 'bf86aa4a89c343c216927904ab3f11da2b876d8b06ece2e3'
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'grocerylk2024'
+const ALLOWED_ORIGINS = [
+  'https://grocerylk.vercel.app',
+  /^https:\/\/grocerylk-.*\.vercel\.app$/,
+  'http://localhost:3001',
+  'http://localhost:5173',
+]
+
 const app = express();
-app.use(cors());
+const corsOpts = {
+  origin: (origin, cb) => {
+    if (!origin || ALLOWED_ORIGINS.some(o => typeof o === 'string' ? o === origin : o.test(origin))) {
+      cb(null, true)
+    } else {
+      cb(null, false)
+    }
+  },
+  credentials: true,
+}
+app.use(cors(corsOpts))
+app.options('*', cors(corsOpts))
 app.use(express.json());
 app.use(express.text({ type: 'text/plain' }));
+
+// ─── Rate limiting ───
+const generalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests' },
+})
+const strictLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests' },
+})
+
+app.use('/api/search', generalLimiter)
+app.use('/api/homepage', generalLimiter)
+app.use('/api/categories', generalLimiter)
+app.use('/api/analytics', strictLimiter)
+app.use('/api/analytics/dashboard', strictLimiter)
+
+// ─── API key check (image/analytics endpoints excluded since they need to work without headers) ───
+app.use('/api', (req, res, next) => {
+  const exempt = ['/myip', '/analytics', '/product-image']
+  if (exempt.some(p => req.path.startsWith(p))) return next()
+  const key = req.headers['x-api-key'] || req.query.api_key
+  if (!key || key !== API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  next()
+})
 
 // ─── Store registry ───
 const STORES = {
@@ -856,6 +910,16 @@ app.get('/api/store-health', async (req, res) => {
 
 // ─── Admin dashboard page ───
 app.get('/api/myip', (req, res) => res.json({ ip: req.ip }));
+
+app.get('/admin', (req, res, next) => {
+  const pw = req.query.pw
+  if (pw !== ADMIN_PASSWORD) {
+    return res.type('html').send(
+      '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin</title><style>body{font-family:system-ui,sans-serif;background:#0d1117;color:#c9d1d9;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}form{background:#161b22;padding:32px;border-radius:8px;border:1px solid #30363d}input{display:block;width:100%;padding:10px;margin:12px 0;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#fff;font-size:16px}button{width:100%;padding:10px;background:#00a86b;border:none;border-radius:6px;color:#fff;font-size:16px;cursor:pointer}h2{margin:0 0 8px}</style></head><body><form method="GET" action="/admin"><h2>Admin Login</h2><input type="password" name="pw" placeholder="Password" autofocus/><button type="submit">Enter</button></form></body></html>'
+    )
+  }
+  next()
+})
 
 app.get('/admin', (req, res) => {
   res.type('html').send(
