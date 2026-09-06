@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -257,7 +258,7 @@ const PRODUCT_TYPES = new Set([
   'salt', 'noodles', 'pasta', 'biscuit', 'chocolate', 'drink', 'juice', 'water',
   'tuna', 'fish', 'chicken', 'meat', 'egg', 'butter', 'cheese', 'yogurt',
   'toothpaste', 'brush', 'tissue', 'paper', 'cleaner', 'cooking',
-  'string', 'hopper', 'hopper', 'bread', 'chilli', 'turmeric', 'cumin', 'pepper',
+  'string', 'hopper', 'bread', 'chilli', 'turmeric', 'cumin', 'pepper',
   'onion', 'potato', 'tomato', 'carrot', 'lemon', 'coconut', 'banana',
   'noodles', 'vermicelli', 'flakes', 'mixture', 'sauce', 'pickle', 'achcharu',
   'jam', 'honey', 'syrup', 'ketchup', 'mayonnaise', 'dressing', 'vinegar',
@@ -275,6 +276,8 @@ function parseQty(name) {
   let unit = m[2].replace(/s$/, '');
   if (unit === 'kg' || unit === 'kilo' || unit === 'kgs') { val *= 1000; unit = 'g'; }
   if (unit === 'litre' || unit === 'litres') { val *= 1000; unit = 'ml'; }
+  if (unit === 'lb') { val *= 453.59; unit = 'g'; }
+  if (unit === 'oz') { val *= 28.35; unit = 'g'; }
   if (unit === 'pcs' || unit === 'pieces' || unit === 'piece') unit = 'pcs';
   if (unit === 'box') unit = 'pcs';
   if (unit === 'bag') unit = 'pcs';
@@ -386,6 +389,7 @@ function matchProducts(products) {
 
 // ─── Kapruka image scraper ───
 const kaprukaImageCache = new Map();
+const KAPRUKA_IMG_CACHE_MAX = 500;
 
 async function fetchKaprukaImage(productId, productUrl) {
   if (kaprukaImageCache.has(productId)) return kaprukaImageCache.get(productId);
@@ -394,6 +398,10 @@ async function fetchKaprukaImage(productId, productUrl) {
     const html = await res.text();
     const match = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i);
     const url = match ? match[1] : '';
+    if (kaprukaImageCache.size >= KAPRUKA_IMG_CACHE_MAX) {
+      const firstKey = kaprukaImageCache.keys().next().value
+      if (firstKey) kaprukaImageCache.delete(firstKey)
+    }
     kaprukaImageCache.set(productId, url);
     return url;
   } catch {
@@ -462,9 +470,10 @@ function getAutoStores(health, fast) {
   }
   const healthy = all.filter(id => health[id] ? health[id].healthy !== false : true)
   if (fast) {
-    return healthy.filter(s => STORE_PRIORITY.indexOf(s) <= STORE_PRIORITY.indexOf('glomark'))
+    const result = healthy.filter(s => STORE_PRIORITY.indexOf(s) <= STORE_PRIORITY.indexOf('glomark'))
+    return result.length > 0 ? result : healthy
   }
-  return healthy
+  return healthy.length > 0 ? healthy : all
 }
 
 // ─── Search all stores helper with auto health tracking ───
@@ -994,7 +1003,7 @@ app.get('/admin', (req, res) => {
 
 // ─── SEO product pages ───
 const SEO_PAGES = [
-  { slug: 'rice-price-sri-lanka', query: 'rice', name: 'Rice', desc: 'Compare rice prices across Sri Lankan stores. Find the best deal on nike rice, basmati, samba, and more.' },
+  { slug: 'rice-price-sri-lanka', query: 'rice', name: 'Rice', desc: 'Compare rice prices across Sri Lankan stores. Find the best deal on basmati, samba, and more.' },
   { slug: 'dhal-price-sri-lanka', query: 'dhal', name: 'Dhal', desc: 'Compare dhal (parippu) prices in Sri Lanka. Find the cheapest red dhal, green gram, and lentils across stores.' },
   { slug: 'milk-powder-price-sri-lanka', query: 'milk powder', name: 'Milk Powder', desc: 'Compare milk powder prices in Sri Lanka. Find the best deal on Anchor, Ratthi, Nespray, and more brands.' },
   { slug: 'eggs-price-sri-lanka', query: 'eggs', name: 'Eggs', desc: 'Compare egg prices across Sri Lankan stores. Find the cheapest tray of eggs near you.' },
@@ -1011,9 +1020,9 @@ const SEO_PAGES = [
   { slug: 'battery-price-sri-lanka', query: 'battery', name: 'Batteries', desc: 'Compare battery prices in Sri Lanka. Find AA, AAA, and rechargeable batteries from Eveready, Duracell, and more.' },
   { slug: 'shampoo-price-sri-lanka', query: 'shampoo', name: 'Shampoo', desc: 'Compare shampoo prices in Sri Lanka. Find Sunsilk, Pantene, Dove, and Head & Shoulders at the best price.' },
   { slug: 'toothpaste-price-sri-lanka', query: 'toothpaste', name: 'Toothpaste', desc: 'Compare toothpaste prices in Sri Lanka. Find Colgate, Pepsodent, Sensodyne, and more across stores.' },
-  { slug: 'masala-price-sri-lanka', query: 'masala', name: 'Masala & Spices', desc: 'Compare masala and spice prices in Sri Lanka. Find curry powder, chili powder, turmeric, and更多 spices.' },
+  { slug: 'masala-price-sri-lanka', query: 'masala', name: 'Masala & Spices', desc: 'Compare masala and spice prices in Sri Lanka. Find curry powder, chili powder, turmeric, and more spices.' },
   { slug: 'jam-price-sri-lanka', query: 'jam', name: 'Jam', desc: 'Compare jam prices in Sri Lanka. Find fruit jam, marmalade, and spreads at the cheapest price.' },
-  { slug: 'sauce-price-sri-lanka', query: 'sauce', name: 'Sauce', desc: 'Compare sauce prices across Sri Lankan stores. Find ketchup, chili sauce, soya sauce, and更多.' },
+  { slug: 'sauce-price-sri-lanka', query: 'sauce', name: 'Sauce', desc: 'Compare sauce prices across Sri Lankan stores. Find ketchup, chili sauce, soya sauce, and more.' },
   { slug: 'ice-cream-price-sri-lanka', query: 'ice cream', name: 'Ice Cream', desc: 'Compare ice cream prices in Sri Lanka. Find ice cream tubs, cones, and popsicles across stores.' },
   { slug: 'toilet-paper-price-sri-lanka', query: 'toilet paper', name: 'Toilet Paper', desc: 'Compare toilet paper and tissue prices in Sri Lanka. Find rolls, packs, and jumbo rolls at the best price.' },
   { slug: 'detergent-price-sri-lanka', query: 'detergent', name: 'Detergent', desc: 'Compare laundry detergent prices in Sri Lanka. Find Ariel, Surf Excel, and washing powder across stores.' },
@@ -1026,10 +1035,10 @@ const SEO_PAGES = [
   { slug: 'soya-meat-price-sri-lanka', query: 'soya meat', name: 'Soya Meat', desc: 'Compare soya meat and TVP prices in Sri Lanka. Find soya chunks, mince, and nuggets across stores.' },
   { slug: 'toothbrush-price-sri-lanka', query: 'toothbrush', name: 'Toothbrush', desc: 'Compare toothbrush prices in Sri Lanka. Find Oral-B, Colgate, and electric toothbrushes across stores.' },
   { slug: 'dilmah-tea-price-sri-lanka', query: 'dilmah', name: 'Dilmah Tea', desc: 'Compare Dilmah tea prices in Sri Lanka. Find Dilmah Ceylon tea bags, green tea, and premium tea boxes.' },
-  { slug: 'kiribath-price-sri-lanka', query: 'kiribath', name: 'Kiribath Ingredients', desc: 'Compare kiribath and milk rice ingredient prices in Sri Lanka. Find rice, coconut milk, and更多.' },
+  { slug: 'kiribath-price-sri-lanka', query: 'kiribath', name: 'Kiribath Ingredients', desc: 'Compare kiribath and milk rice ingredient prices in Sri Lanka. Find rice, coconut milk, and more.' },
   { slug: 'coconut-price-sri-lanka', query: 'coconut', name: 'Coconut', desc: 'Compare coconut and coconut product prices in Sri Lanka. Find fresh coconuts, coconut milk, and coconut oil.' },
   { slug: 'salt-price-sri-lanka', query: 'salt', name: 'Salt', desc: 'Compare salt prices in Sri Lanka. Find table salt, sea salt, and rock salt across stores.' },
-  { slug: 'face-cream-price-sri-lanka', query: 'face cream', name: 'Face Cream', desc: 'Compare face cream and moisturizer prices in Sri Lanka. Find Nivea, Olay, Ponds, and更多 brands.' },
+  { slug: 'face-cream-price-sri-lanka', query: 'face cream', name: 'Face Cream', desc: 'Compare face cream and moisturizer prices in Sri Lanka. Find Nivea, Olay, Ponds, and more brands.' },
   { slug: 'washing-powder-price-sri-lanka', query: 'washing powder', name: 'Washing Powder', desc: 'Compare washing powder prices in Sri Lanka. Find laundry detergent, stain remover, and fabric softener.' },
   { slug: 'candle-price-sri-lanka', query: 'candle', name: 'Candles', desc: 'Compare candle prices in Sri Lanka. Find scented candles, tea lights, and emergency candles across stores.' },
   { slug: 'tuna-price-sri-lanka', query: 'tuna', name: 'Tuna', desc: 'Compare canned tuna prices in Sri Lanka. Find tuna in oil, brine, and flavored tuna across stores.' },
@@ -1162,9 +1171,14 @@ app.get('/sitemap.xml', (req, res) => {
 ${urls}
 </urlset>`)
 })
-import { readFileSync } from 'fs';
-const __shortHtml = readFileSync(path.join(__dirname, 'youtube-short.html'), 'utf-8');
-app.get('/short', (req, res) => res.type('html').send(__shortHtml));
+app.get('/short', (req, res) => {
+  try {
+    const html = readFileSync(path.join(__dirname, 'youtube-short.html'), 'utf-8')
+    res.type('html').send(html)
+  } catch (e) {
+    res.redirect('/')
+  }
+});
 
 // ─── Promo video ───
 app.get('/promo.mp4', (req, res) => {

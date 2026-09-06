@@ -127,7 +127,8 @@ export async function recordEvent(eventType, sessionId, data, ip, ua, country) {
 
 export async function getAnalyticsSummary(excludeIp) {
   await ensureReady()
-  const ipFilter = excludeIp ? `AND ip != '${excludeIp.replace(/'/g, "''")}'` : ''
+  const safeIp = excludeIp ? excludeIp.replace(/\s/g, '').replace(/[^\x21-\x7E]/g, '') : ''
+  const ipFilter = safeIp ? `AND ip != '${safeIp.replace(/'/g, "''")}'` : ''
   try {
     const [visits, searches, lists] = await Promise.all([
       db.execute({ sql: `SELECT COUNT(DISTINCT session_id) as c FROM page_events WHERE event_type = 'visit' ${ipFilter}` }).then(r => r.rows[0]?.c || 0),
