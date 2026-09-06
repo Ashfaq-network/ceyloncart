@@ -1107,6 +1107,47 @@ async function fetchItemsSafe(query, count) {
   }
 }
 
+// FAQ content + FAQPage schema for rich results on product pages.
+function buildFaqs(page, items, cheapest) {
+  const name = page.name.toLowerCase()
+  return [
+    {
+      q: `How much does ${name} cost in Sri Lanka today?`,
+      a: cheapest
+        ? `${page.name} currently starts from ${fmtPrice(cheapest)} at ${name} from ${cheapest.storeName || cheapest.store} in Sri Lanka. Prices are captured live from the store websites and update daily.`
+        : `${page.name} prices in Sri Lanka change frequently. We refresh the comparison across all major stores daily — check back shortly for the current figures.`,
+    },
+    {
+      q: `Which store sells ${name} the cheapest in Sri Lanka?`,
+      a: cheapest
+        ? `Based on the latest live comparison, ${cheapest.storeName || cheapest.store} currently offers the best price for ${name} at ${fmtPrice(cheapest)}.`
+        : `We compare ${name} prices across Cargills, Kapruka, SPAR, Glomark, Arpico and GFC. Check back shortly for the current cheapest store.`,
+    },
+    {
+      q: `How often is the ${name} price updated on GroceryLK?`,
+      a: `GroceryLK refreshes ${name} prices from the Sri Lankan store websites every day, so the comparison reflects the current shelf price rather than a stale price list.`,
+    },
+  ]
+}
+
+function faqsJsonLd(faqs) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map(f => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
+  }
+}
+
+function faqsHtml(faqs) {
+  return `<h2>Frequently asked questions</h2>` + faqs.map(f =>
+    `<details style="margin-bottom:10px;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px 18px"><summary style="font-size:14px;font-weight:600;color:#f0f6fc;cursor:pointer">${esc(f.q)}</summary><p style="font-size:13px;color:#8b949e;line-height:1.6;margin-top:10px">${esc(f.a)}</p></details>`
+  ).join('')
+}
+
 // ─── Product price SEO pages (/p/:slug) ───
 app.get('/p/:slug', async (req, res) => {
   const page = SEO_PAGES.find(p => p.slug === req.params.slug)
@@ -1118,6 +1159,7 @@ app.get('/p/:slug', async (req, res) => {
     const currency = 'LKR'
     const today = todayISO()
     const priceValidUntil = tomorrowISO()
+    const faqs = buildFaqs(page, items, cheapest)
     const bodyHtml = (page.body || []).map(p => `<p style="font-size:14px;color:#8b949e;line-height:1.7;margin-bottom:14px">${esc(p)}</p>`).join('')
 
     const jsonld = [
@@ -1146,7 +1188,6 @@ app.get('/p/:slug', async (req, res) => {
           availability: p.inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
           itemCondition: 'https://schema.org/NewCondition',
         })),
-        aggregateRating: cheapest ? undefined : undefined,
       },
       {
         '@context': 'https://schema.org',
@@ -1159,8 +1200,10 @@ app.get('/p/:slug', async (req, res) => {
           { '@type': 'ListItem', position: 3, name: `${page.name} Price`, item: `${BASE_URL}/p/${page.slug}` },
         ],
       },
+      faqsJsonLd(faqs),
     ]
 
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=600')
     res.type('html').send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1221,6 +1264,8 @@ h2{font-size:16px;color:#f0f6fc;margin:24px 0 12px}
 
   <h2>Live ${esc(page.name)} prices from 6 stores</h2>
   ${items.length ? `<div class="results">${storeCardsHtml(items)}</div>` : '<p style="text-align:center;padding:40px;color:#666">No prices found at the moment. Try again later.</p>'}
+
+  ${faqsHtml(faqs)}
 
   ${relatedLinksHtml(page)}
 
@@ -1302,6 +1347,7 @@ app.get('/category/:slug', async (req, res) => {
       </a>`
     }).join('')
 
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=600')
     res.type('html').send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1400,6 +1446,7 @@ app.get('/p/:slug/:store', async (req, res) => {
           <span style="font-size:13px;font-weight:700;color:${cheapest ? '#00a86b' : '#f0f6fc'}">${fmtPrice(p)}</span>
         </div>`).join('')
 
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=600')
     res.type('html').send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1468,6 +1515,7 @@ app.get('/si/:slug', async (req, res) => {
       ? storeCardsHtml(items)
       : '<p style="text-align:center;padding:40px;color:#666">මේ මොහොතේ මිල ගණන් නොමැත. පසුව නැවත උත්සාහ කරන්න.</p>'
 
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=600')
     res.type('html').send(`<!DOCTYPE html>
 <html lang="si">
 <head>
@@ -1546,7 +1594,10 @@ app.get('/sitemap.xml', (req, res) => {
   }
   // Sinhala pages
   const siPages = Object.keys(SI_PAGES).map(s => SEO_PAGES.find(p => p.slug === s) ? url(`${BASE_URL}/si/${s}`, '0.7', 'daily') : '').filter(Boolean).join('\n')
+  // Store hub pages
+  const stores = Object.keys(STORE_META).map(s => url(`${BASE_URL}/store/${s}`, '0.6', 'weekly')).join('\n')
 
+  res.set('Cache-Control', 'public, max-age=3600, s-maxage=3600')
   res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${home}
@@ -1554,11 +1605,13 @@ ${cats}
 ${products}
 ${subpages.join('\n')}
 ${siPages}
+${stores}
 </urlset>`)
 })
 
 // ─── robots.txt ───
 app.get('/robots.txt', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=3600')
   res.type('text/plain').send(`User-agent: *
 Allow: /
 Disallow: /api/
@@ -1571,6 +1624,7 @@ Sitemap: ${BASE_URL}/sitemap.xml
 // ─── IndexNow (real-time indexing signal) ───
 const INDEXNOW_KEY = process.env.INDEXNOW_KEY || '2f7c9e3a8b1d4f6a9c0e5b7d3a1f8c4e'
 app.get('/indexnow-key-9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d.txt', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=3600')
   res.type('text/plain').send(INDEXNOW_KEY)
 })
 app.post('/api/indexnow', async (req, res) => {
@@ -1604,6 +1658,101 @@ app.get('/short', (req, res) => {
 app.get('/promo.mp4', (req, res) => {
   res.sendFile(path.join(__dirname, 'promo.mp4'));
 });
+
+// ─── Store hub pages (/store/:storeId) — "Cargills price list" style pages ───
+app.get('/store/:storeId', (req, res) => {
+  const store = STORE_META[req.params.storeId]
+  if (!store) return res.redirect('/')
+
+  const today = todayISO()
+  const subPages = Object.entries(STORE_SUBPAGES)
+    .filter(([, stores]) => stores.includes(req.params.storeId))
+    .map(([slug]) => SEO_PAGES.find(p => p.slug === slug))
+    .filter(Boolean)
+  const allProducts = SEO_PAGES
+  const links = subPages.map(p =>
+    `<a href="/p/${p.slug}/${req.params.storeId}" style="display:block;padding:12px 16px;background:#0d1117;border:1px solid #21262d;border-radius:8px;margin-bottom:8px;color:#00a86b;text-decoration:none;font-size:14px">${esc(p.name)} price at ${esc(store.name)} &#8594;</a>`
+  ).join('')
+  const browse = allProducts
+    .map(p => `<a href="/p/${p.slug}" style="color:#8b949e;text-decoration:none;font-size:13px;display:inline-block;margin:0 10px 8px 0">${esc(p.name)}</a>`)
+    .join('')
+
+  const jsonld = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      name: `${store.name} Price List in Sri Lanka`,
+      description: `Current ${store.name} prices in Sri Lanka for every grocery item, compared live and updated daily.`,
+      url: `${BASE_URL}/store/${req.params.storeId}`,
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+        { '@type': 'ListItem', position: 2, name: `${store.name} Prices`, item: `${BASE_URL}/store/${req.params.storeId}` },
+      ],
+    },
+  ]
+
+  res.set('Cache-Control', 'public, max-age=300, s-maxage=600')
+  res.type('html').send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>${esc(store.name)} Price List 2026 — Sri Lanka Prices</title>
+<meta name="description" content="Current ${esc(store.name)} prices in Sri Lanka — rice, dhal, milk powder, eggs and more, updated daily. Compare ${esc(store.name)} against 5 other stores.">
+<link rel="canonical" href="${BASE_URL}/store/${req.params.storeId}">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="dateModified" content="${today}">
+<meta property="og:title" content="${esc(store.name)} Price List 2026">
+<meta property="og:description" content="Current ${esc(store.name)} prices in Sri Lanka, updated daily.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="${SITE_NAME}">
+<script type="application/ld+json">${JSON.stringify(jsonld)}</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0d1117;color:#c9d1d9;padding:0}
+.header{background:#161b22;border-bottom:1px solid #30363d;padding:20px 24px;text-align:center}
+.header h1{font-size:24px;color:#f0f6fc;margin-bottom:4px}
+.header .sub{font-size:13px;color:#8b949e}
+.header .logo-link{color:#00a86b;text-decoration:none;font-weight:700;font-size:14px;display:inline-block;margin-top:10px}
+.container{max-width:680px;margin:0 auto;padding:24px 16px}
+.breadcrumb{font-size:12px;color:#555;margin-bottom:20px}
+.breadcrumb a{color:#8b949e;text-decoration:none}
+.breadcrumb span{color:#555}
+.updated{display:inline-block;margin-bottom:16px;padding:6px 12px;background:#1b2e26;border:1px solid #00a86b;border-radius:999px;font-size:12px;color:#00a86b}
+h2{font-size:16px;color:#f0f6fc;margin:24px 0 12px}
+p{font-size:14px;color:#8b949e;line-height:1.7;margin-bottom:14px}
+.footer{text-align:center;padding:24px;font-size:12px;color:#555;border-top:1px solid #21262d;margin-top:40px}
+.footer a{color:#8b949e;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>${esc(store.name)} Price List in Sri Lanka</h1>
+  <div class="sub">Live prices, updated daily &middot; Compare with 5 other stores</div>
+  <a class="logo-link" href="/">&#8592; ${SITE_NAME} Home</a>
+</div>
+<div class="container">
+  <div class="breadcrumb"><a href="/">Home</a> <span>/</span> <span>${esc(store.name)} Prices</span></div>
+  <span class="updated">Updated ${today} &middot; Daily live prices</span>
+  <p>Browse current ${esc(store.name)} prices in Sri Lanka. Each item below shows the live price at ${esc(store.name)} and compares it against the other major chains so you always know where to get the best deal.</p>
+
+  ${links ? `<h2>Live ${esc(store.name)} prices</h2>${links}` : ''}
+
+  <h2>Browse all grocery prices</h2>
+  <div style="line-height:1.9">${browse}</div>
+
+  <p style="margin-top:20px">${esc(store.name)} is one of six stores tracked by ${SITE_NAME}. ${esc(store.name)} prices change with promotions and supply, so check back regularly or use the comparison to spread your shopping across the cheapest stores.</p>
+</div>
+<div class="footer">
+  <p>&copy; 2026 <a href="/">${SITE_NAME}</a> &mdash; Sri Lanka Grocery Price Comparison</p>
+</div>
+</body>
+</html>`)
+})
 
 // ─── Production: serve client build ───
 const clientDist = path.join(__dirname, 'dist');

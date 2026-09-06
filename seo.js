@@ -689,6 +689,76 @@ export const SEO_PAGES = [
       'Compare per-100g prices, as bar weights differ widely across brands.',
     ],
   },
+  {
+    slug: 'saree-price-sri-lanka',
+    query: 'saree',
+    name: 'Saree',
+    title: 'Saree Price in Sri Lanka — Buy Online at the Best Price',
+    desc: 'Compare saree prices in Sri Lanka. Find party wear, cotton, silk and trendy sarees online at the best price across Kapruka, Cargills, SPAR and more.',
+    category: 'fashion',
+    size: 'per saree',
+    body: [
+      'Sarees are a significant fashion purchase in Sri Lanka, and prices vary hugely by fabric, brand and occasion. GroceryLK compares live saree prices from online sellers so you can find a good price without bargaining.',
+      'Cotton sarees are the most affordable everyday option, while silk and party-wear sarees command premium prices. Runner, plain, printed and traditional designs all sit in different price bands.',
+      'Online saree prices are easy to compare because the same design is often listed by several sellers. Use the comparison below to see current prices side by side before you buy.',
+    ],
+  },
+  {
+    slug: 'fruits-price-sri-lanka',
+    query: 'fruits',
+    name: 'Fruits',
+    title: 'Fruit Price in Sri Lanka — Per Kg by Store',
+    desc: 'Compare fruit prices in Sri Lanka. See live prices for apples, bananas, oranges and more across Cargills, Kapruka, SPAR, Glomark & Arpico.',
+    category: 'fruits',
+    size: 'per kg',
+    body: [
+      'Fresh fruit is a daily part of the Sri Lankan diet, and prices swing with supply and season. GroceryLK compares live fruit prices across Cargills, Kapruka, SPAR, Glomark and Arpico.',
+      'Bananas, papaya, pineapple and mango are local staples, while apples and oranges are imported and cost more. Prices are quoted per kilogram at most supermarkets.',
+      'Imported fruit prices follow the exchange rate and shipment schedules, so they can change quickly. The live comparison below reflects current prices across the major chains.',
+    ],
+  },
+  {
+    slug: 'cargills-prices-sri-lanka',
+    query: 'cargills',
+    name: 'Cargills Price List',
+    title: 'Cargills Price List 2026 — Food City Live Prices',
+    desc: 'See current Cargills Food City prices in Sri Lanka — rice, dhal, milk powder, eggs and more, compared live and updated daily at GroceryLK.',
+    category: 'store',
+    size: 'various',
+    body: [
+      'Cargills Food City is Sri Lanka\u2019s largest supermarket chain, and millions of households want to know the current Cargills prices before they shop. GroceryLK tracks Cargills prices live for all the staples people buy every week.',
+      'This Cargills price list covers rice, dhal, milk powder, eggs, sugar, cooking oil, bread, chicken and more, with prices captured directly from the Food City online store. Prices move with promotions, stock and the broader market.',
+      'Because Cargills runs frequent promotions, a price checked today may differ next week. Bookmark this page and check back for the current Cargills price list, or browse each item below for the full multi-store comparison.',
+    ],
+  },
+  {
+    slug: 'kapruka-prices-sri-lanka',
+    query: 'kapruka',
+    name: 'Kapruka Price List',
+    title: 'Kapruka Price List 2026 — All Product Categories',
+    desc: 'See current Kapruka prices in Sri Lanka — groceries, sarees, electronics and more, compared live and updated daily at GroceryLK.',
+    category: 'store',
+    size: 'various',
+    body: [
+      'Kapruka is Sri Lanka\u2019s largest online shopping site, growing far beyond groceries into fashion, sarees, electronics and more. GroceryLK tracks live Kapruka prices so online shoppers can see real numbers before ordering.',
+      'Kapruka advertises steep discounts on many items, but the final price depends on the seller and coupon codes. Comparing the listed price against other stores helps you know when a Kapruka deal is genuinely good.',
+      'Kapruka listings change frequently as products go on sale and back off sale. Check back often for the current Kapruka price list, and use the item pages below for detailed comparisons.',
+    ],
+  },
+  {
+    slug: 'supermarket-price-comparison-sri-lanka',
+    query: 'supermarket',
+    name: 'Supermarket Price Comparison',
+    title: 'Supermarket Prices in Sri Lanka — Compare All Stores 2026',
+    desc: 'Compare supermarket prices in Sri Lanka across Cargills, Kapruka, SPAR, Glomark, Arpico and GFC. See which store is cheapest for every grocery item.',
+    category: 'store',
+    size: 'various',
+    body: [
+      'Which supermarket in Sri Lanka is cheapest? The answer changes by item and by week, which is exactly why GroceryLK compares prices live across Cargills, Kapruka, SPAR, Glomark, Arpico and GFC.',
+      'No single store is cheapest on everything. One chain may lead on rice while another wins on milk powder or household goods. Comparing per-item across stores is the reliable way to cut your monthly grocery bill.',
+      'This page is the hub for the whole comparison: every grocery category is listed below with the live per-item prices from all six stores. Browse the category you shop most to see who is cheapest today.',
+    ],
+  },
 ]
 
 // Category hubs — /category/:slug aggregate related products into a hub page.
@@ -706,6 +776,9 @@ export const CATEGORIES = {
   spices: { name: 'Spices & Masala', title: 'Spice & Masala Prices in Sri Lanka', desc: 'Chilli, masala, turmeric and spice prices in Sri Lanka compared across all major stores.' },
   household: { name: 'Household & Cleaning', title: 'Household & Cleaning Prices in Sri Lanka', desc: 'Detergent, toilet paper, batteries and household product prices in Sri Lanka compared across all stores.' },
   baby: { name: 'Baby & Diapers', title: 'Baby Product Prices in Sri Lanka', desc: 'Diapers, wipes and baby product prices in Sri Lanka compared across all major stores.' },
+  fashion: { name: 'Fashion & Sarees', title: 'Saree & Fashion Prices in Sri Lanka', desc: 'Saree and fashion prices in Sri Lanka compared across online sellers.' },
+  fruits: { name: 'Fruits', title: 'Fresh Fruit Prices in Sri Lanka — Per Kg', desc: 'Fresh fruit prices in Sri Lanka compared per kg across Cargills, Kapruka, SPAR, Glomark & Arpico. Bananas, apples, oranges and more.' },
+  store: { name: 'Store Price Lists', title: 'Supermarket Price Lists in Sri Lanka', desc: 'Compare Cargills, Kapruka, SPAR, Glomark, Arpico and GFC price lists in Sri Lanka — live prices for every grocery item.' },
 }
 
 // Store sub-pages: /p/:slug/:store for store-specific queries.
