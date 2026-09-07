@@ -76,6 +76,7 @@ app.use('/api/homepage', generalLimiter)
 app.use('/api/categories', generalLimiter)
 app.use('/api/analytics', strictLimiter)
 app.use('/api/analytics/dashboard', strictLimiter)
+app.use('/api/basket', strictLimiter)
 
 // ─── API key check (image/analytics endpoints excluded since they need to work without headers) ───
 app.use('/api', (req, res, next) => {
@@ -733,6 +734,62 @@ app.get('/api/search', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ─── Basket builder: fresh prices for a list of items, optimized split ───
+const BASKET_MAX_ITEMS = 12
+
+async function basketSearch(query, limit) {
+  try {
+    const cached = await getCachedSearch(normalizeQuery(query), Object.keys(STORES), '')
+    if (cached && Array.isArray(cached.results) && cached.results.length) return cached.results
+  } catch {}
+  const d = await searchAllStores(query, { limit }).catch(() => null)
+  return (d?.merged || []).filter(p => p.price > 0)
+}
+
+app.post('/api/basket', async (req, res) => {
+  try {
+    const items = Array.isArray(req.body?.items) ? req.body.items.slice(0, BASKET_MAX_ITEMS) : []
+    const clean = items
+      .map(i => ({
+        q: String(i.q || '').trim(),
+        qty: Math.max(1, parseInt(i.qty, 10) || 1),
+        unit: String(i.unit || ''),
+      }))
+      .filter(i => i.q)
+    if (!clean.length) return res.status(400).json({ error: 'items required' })
+
+    const batched = await Promise.all(clean.map(async item => {
+      const products = await basketSearch(item.q, 8)
+      return { ...item, products }
+    }))
+
+    const out = batched.map(({ q, qty, unit, products }) => {
+      const byStore = {}
+      for (const p of products) {
+        const cur = byStore[p.store]
+        if (!cur || p.price < cur.price) byStore[p.store] = p
+      }
+      return { q, qty, unit, stores: byStore }
+    })
+
+    const histDb = getDb()
+    if (histDb) {
+      Promise.allSettled(
+        batched.flatMap(({ q, products }) =>
+          products.slice(0, 8).map(p => histDb.execute({
+            sql: `INSERT OR IGNORE INTO price_history (product_key, store, price, currency, recorded_at) VALUES (?, ?, ?, ?, datetime('now'))`,
+            args: [`${p.store}:${p.originalId || p.id}`, p.store, p.price, p.currency || 'LKR'],
+          }))
+        )
+      ).catch(() => {})
+    }
+
+    res.json({ items: out, generatedAt: new Date().toISOString() })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
 
 app.get('/api/product/:id', async (req, res) => {
   try {

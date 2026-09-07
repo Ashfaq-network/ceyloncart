@@ -1896,3 +1896,42 @@ html { scroll-behavior: smooth; }
   .gl-plan-item-price { font-size: 12px; }
   .gl-tab { font-size: 11px; padding: 5px 12px; }
 }
+
+/* ─── Basket Builder ─── */
+.bk-chip {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.bk-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; cursor: default; }
+.bk-chip:not(.active):hover { border-color: var(--accent); color: var(--accent); }
+.bk-items { display: flex; flex-direction: column; gap: 8px; }
+.bk-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.bk-row-name { flex: 1; display: flex; flex-direction: column; }
+.bk-qty { display: flex; align-items: center; gap: 10px; }
+.bk-qty-btn {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+}
+.bk-qty-btn:hover { border-color: var(--accent); color: var(--accent); }
+.bk-qty-val { min-width: 24px; text-align: center; font-weight: 700; color: var(--text-primary); font-size: 14px; }

@@ -8,6 +8,7 @@ import ProductGrid from './components/ProductGrid'
 import CategoryBrowser from './components/CategoryBrowser'
 import OrderModal from './components/OrderModal'
 import GroceryList from './components/GroceryList'
+import BasketBuilder from './components/BasketBuilder'
 import Footer from './components/Footer'
 import { track } from './analytics'
 import { apiFetch } from './api'
@@ -404,6 +405,8 @@ export default function App() {
           </section>
         )}
     </div>
+
+    <BasketBuilder />
 
     <GroceryList items={groceryList} stores={stores} onRemove={removeFromGroceryList} onClear={clearGroceryList} />
 
