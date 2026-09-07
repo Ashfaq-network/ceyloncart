@@ -86,6 +86,7 @@ const en = {
     copyText: '\uD83D\uDCCB Copy Text',
     copied: '\u2713 Copied!',
     notFound: 'no live price',
+    trends: 'Price trend \u00b7 last 30 days',
   },
   product: {
     inStock: 'In Stock',
@@ -209,6 +210,7 @@ const si = {
     copyText: '\uD83D\uDCCB පිටපතක් ගන්න',
     copied: '\u2713 පිටපත් කළා!',
     notFound: 'සජීවී මිල නැත',
+    trends: 'මිල ප්රවණතාව · අවසන් දින 30',
   },
   product: {
     inStock: 'තොගයේ',

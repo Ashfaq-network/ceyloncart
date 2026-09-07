@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { getDb, initDb, getCachedSearch, setCachedSearch, getCacheStats, recordEvent, getAnalyticsSummary, getCachedCategory, setCachedCategory } from './db.js';
+import { getDb, initDb, getCachedSearch, setCachedSearch, getCacheStats, recordEvent, getAnalyticsSummary, getCachedCategory, setCachedCategory, getProductTrend } from './db.js';
 import { cleanName, formatPrice } from './utils.js';
 import { searchGlomark, normalizeGlomark } from './glomark-connector.js';
 import { searchArpico } from './arpico-connector.js';
@@ -773,6 +773,12 @@ app.post('/api/basket', async (req, res) => {
       return { q, qty, unit, stores: byStore }
     })
 
+    const withTrend = await Promise.all(out.map(async item => {
+      const keys = Object.values(item.stores).map(p => `${p.store}:${p.originalId || p.id}`)
+      const trend = await getProductTrend(keys, 30)
+      return { ...item, trend }
+    }))
+
     const histDb = getDb()
     if (histDb) {
       Promise.allSettled(
@@ -785,7 +791,7 @@ app.post('/api/basket', async (req, res) => {
       ).catch(() => {})
     }
 
-    res.json({ items: out, generatedAt: new Date().toISOString() })
+    res.json({ items: withTrend, generatedAt: new Date().toISOString() })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
@@ -1205,6 +1211,33 @@ function faqsHtml(faqs) {
   ).join('')
 }
 
+// 30-day price trend sparkline + summary for SEO pages and basket results.
+function trendHtml(trend) {
+  if (!trend || trend.length < 1) return ''
+  const w = 640, h = 90, pad = 8
+  const prices = trend.map(t => t.p)
+  const min = Math.min(...prices), max = Math.max(...prices)
+  const range = (max - min) || 1
+  const hasChart = trend.length > 1
+  const pts = trend.map((t, i) => {
+    const x = pad + (i / (trend.length - 1)) * (w - pad * 2)
+    const y = h - pad - ((t.p - min) / range) * (h - pad * 2)
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+  const low = min, high = max, cur = prices[prices.length - 1], first = prices[0]
+  const arrow = cur > first ? '\u2191' : cur < first ? '\u2193' : '\u2192'
+  return `<div style="margin-top:28px;padding:20px;background:#161b22;border:1px solid #30363d;border-radius:12px">
+    <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8b949e;margin-bottom:12px">Price trend &middot; last 30 days</div>
+    ${hasChart ? `<svg viewBox="0 0 ${w} ${h}" style="width:100%;max-width:${w}px;height:auto;display:block" preserveAspectRatio="none" role="img" aria-label="30 day price trend">
+      <polyline points="${pts}" fill="none" stroke="#00a86b" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>` : ''}
+    <div style="display:flex;flex-wrap:wrap;gap:20px;margin-top:10px;font-size:12px;color:#8b949e">
+      <span>30-day low: <b style="color:#f0f6fc">${formatPrice(low)}</b></span>
+      <span>30-day high: <b style="color:#f0f6fc">${formatPrice(high)}</b></span>
+      <span>now: <b style="color:#00a86b">${arrow} ${formatPrice(cur)}</b></span>
+    </div></div>`
+}
+
 // ─── Product price SEO pages (/p/:slug) ───
 app.get('/p/:slug', async (req, res) => {
   const page = SEO_PAGES.find(p => p.slug === req.params.slug)
@@ -1217,6 +1250,8 @@ app.get('/p/:slug', async (req, res) => {
     const today = todayISO()
     const priceValidUntil = tomorrowISO()
     const faqs = buildFaqs(page, items, cheapest)
+    const trendKeys = items.map(p => `${p.store}:${p.originalId || p.id}`)
+    const trend = await getProductTrend(trendKeys, 30)
     const bodyHtml = (page.body || []).map(p => `<p style="font-size:14px;color:#8b949e;line-height:1.7;margin-bottom:14px">${esc(p)}</p>`).join('')
 
     const jsonld = [
@@ -1323,6 +1358,8 @@ h2{font-size:16px;color:#f0f6fc;margin:24px 0 12px}
   ${items.length ? `<div class="results">${storeCardsHtml(items)}</div>` : '<p style="text-align:center;padding:40px;color:#666">No prices found at the moment. Try again later.</p>'}
 
   ${faqsHtml(faqs)}
+
+  ${trendHtml(trend)}
 
   ${relatedLinksHtml(page)}
 

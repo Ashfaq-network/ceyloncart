@@ -73,6 +73,24 @@ async function ensureReady() {
 export function getDb() { return db }
 export async function initDb() { await ensureReady() }
 
+// Daily-cheapest price series across a set of product keys (for trend charts).
+export async function getProductTrend(keys, days = 30) {
+  await ensureReady()
+  if (!Array.isArray(keys) || !keys.length) return []
+  const unique = [...new Set(keys)].slice(0, 60)
+  const placeholders = unique.map(() => '?').join(',')
+  try {
+    const rows = await db.execute({
+      sql: `SELECT date(recorded_at) as d, MIN(price) as price
+            FROM price_history
+            WHERE product_key IN (${placeholders}) AND recorded_at >= datetime('now', '-' || ? || ' days')
+            GROUP BY d ORDER BY d ASC`,
+      args: [...unique, days],
+    }).then(r => r.rows)
+    return rows.map(r => ({ d: r.d, p: r.price }))
+  } catch (e) { return [] }
+}
+
 export async function getCachedSearch(query, stores, sort) {
   await ensureReady()
   const storeKey = Array.isArray(stores) ? [...stores].sort().join(',') : ''

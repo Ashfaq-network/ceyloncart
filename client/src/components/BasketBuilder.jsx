@@ -34,6 +34,24 @@ function fmtPrice(n) {
   return 'Rs ' + Math.round(n).toLocaleString('en-LK')
 }
 
+function Sparkline({ trend }) {
+  if (!trend || trend.length < 2) return null
+  const w = 220, h = 42, pad = 4
+  const prices = trend.map(t => t.p)
+  const min = Math.min(...prices), max = Math.max(...prices)
+  const range = (max - min) || 1
+  const pts = trend.map((t, i) => {
+    const x = pad + (i / (trend.length - 1)) * (w - pad * 2)
+    const y = h - pad - ((t.p - min) / range) * (h - pad * 2)
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} style={{ display: 'block' }} aria-hidden="true">
+      <polyline points={pts} fill="none" stroke="#00a86b" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function buildPlanItems(rawItems) {
   // Find each item's cheapest store: lowest price*qty
   const plan = {}
@@ -284,6 +302,35 @@ export default function BasketBuilder() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Price trends */}
+      {hasData && !loading && raw.items.some(i => (i.trend || []).length > 1) && (
+        <div className="gl-plan-summary" style={{ marginTop: 16 }}>
+          <div className="gl-plan-optimal" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+            <span className="gl-plan-label" style={{ textAlign: 'center', marginBottom: 4 }}>{t('basket.trends')}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {raw.items.filter(i => (i.trend || []).length > 1).map(i => {
+                const prices = i.trend.map(t => t.p)
+                const low = Math.min(...prices), high = Math.max(...prices), first = prices[0], cur = prices[prices.length - 1]
+                const arrow = cur > first ? '▲' : cur < first ? '▼' : '—'
+                return (
+                  <div key={i.q} className="bk-row" style={{ padding: '8px 12px', gap: 12 }}>
+                    <div className="bk-row-name" style={{ minWidth: 90 }}>
+                      <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', textTransform: 'capitalize' }}>{i.q}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                        {fmtPrice(low)} – {fmtPrice(high)} <span style={{ color: cur > first ? '#f85149' : cur < first ? '#00c853' : 'var(--text-secondary)' }}>{arrow} {fmtPrice(cur)}</span>
+                      </span>
+                    </div>
+                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                      <Sparkline trend={i.trend} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       )}
 
