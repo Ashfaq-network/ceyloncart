@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { Analytics } from '@vercel/analytics/react'
 import { LangProvider } from './i18n'
 import ErrorBoundary from './components/ErrorBoundary'
 import App from './App.jsx'
@@ -32,5 +33,6 @@ createRoot(document.getElementById('root'), {
         <App />
       </LangProvider>
     </ErrorBoundary>
+    <Analytics />
   </StrictMode>,
 )
