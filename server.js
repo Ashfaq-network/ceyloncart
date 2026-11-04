@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { getDb, initDb, getCachedSearch, setCachedSearch, getCacheStats, recordEvent, getAnalyticsSummary, getCachedCategory, setCachedCategory, getProductTrend } from './db.js';
+import { getDb, initDb, getCachedSearch, setCachedSearch, getCacheStats, getCachedCategory, setCachedCategory, getProductTrend } from './db.js';
 import { cleanName, formatPrice } from './utils.js';
 import { searchGlomark, normalizeGlomark } from './glomark-connector.js';
 import { searchArpico } from './arpico-connector.js';
@@ -76,13 +76,11 @@ const strictLimiter = rateLimit({
 app.use('/api/search', generalLimiter)
 app.use('/api/homepage', generalLimiter)
 app.use('/api/categories', generalLimiter)
-app.use('/api/analytics', strictLimiter)
-app.use('/api/analytics/dashboard', strictLimiter)
 app.use('/api/basket', strictLimiter)
 
-// ─── API key check (image/analytics endpoints excluded since they need to work without headers) ───
+// ─── API key check ───
 app.use('/api', (req, res, next) => {
-  const exempt = ['/myip', '/analytics', '/product-image', '/indexnow']
+  const exempt = ['/myip', '/product-image', '/indexnow']
   if (exempt.some(p => req.path.startsWith(p))) return next()
   const key = req.headers['x-api-key'] || req.query.api_key
   if (!key || key !== API_KEY) {
@@ -961,243 +959,7 @@ app.get('/api/price-history', async (req, res) => {
   }
 });
 
-// ─── Analytics ───
-app.post('/api/analytics', async (req, res) => {
-  try {
-    let body = req.body
-    if (typeof body === 'string') { try { body = JSON.parse(body) } catch { body = {} } }
-    const { type, session_id, data } = body || {}
-    if (!type) return res.status(400).json({ error: 'type required' })
-    const country = req.headers['x-vercel-ip-country'] || req.headers['cf-ipcountry'] || ''
-    await recordEvent(type, session_id, data, req.ip, req.headers['user-agent'], country)
-    res.json({ ok: true })
-  } catch (e) { res.status(500).json({ ok: false }) }
-})
-
-app.get('/api/analytics/dashboard', async (req, res) => {
-  try { res.json(await getAnalyticsSummary(req.query.exclude_ip)) } catch (e) { res.json({}) }
-})
-
-app.get('/api/store-health', async (req, res) => {
-  try {
-    const health = await getStoreHealth()
-    res.json({ stores: Object.keys(STORES), health })
-  } catch { res.json({ stores: Object.keys(STORES), health: {} }) }
-})
-
-// ─── Contact Us Page & API ───
-app.get('/contact', (req, res) => {
-  res.type('html').send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Contact Us — GroceryLK Sri Lanka</title>
-<meta name="description" content="Get in touch with the GroceryLK team for questions, feedback, store price reporting, or advertising inquiries.">
-<link rel="canonical" href="${BASE_URL}/contact">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:system-ui,-apple-system,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh;display:flex;flex-direction:column}
-header{background:#161b22;border-bottom:1px solid #30363d;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}
-.logo{font-size:20px;font-weight:800;color:#f0f6fc;text-decoration:none}
-.logo span{color:#00a86b}
-nav a{color:#8b949e;text-decoration:none;font-size:14px;margin-left:20px}
-nav a:hover{color:#00a86b}
-main{flex:1;max-width:640px;width:100%;margin:40px auto;padding:0 20px}
-.card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:32px}
-h1{font-size:28px;color:#f0f6fc;margin-bottom:8px}
-p.sub{color:#8b949e;font-size:14px;margin-bottom:24px;line-height:1.6}
-.form-group{margin-bottom:20px}
-label{display:block;font-size:13px;font-weight:600;color:#c9d1d9;margin-bottom:6px}
-input,textarea{width:100%;padding:12px 16px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#fff;font-size:15px;font-family:inherit}
-input:focus,textarea:focus{outline:none;border-color:#00a86b}
-textarea{min-height:140px;resize:vertical}
-button{width:100%;padding:14px;background:#00a86b;border:none;border-radius:8px;color:#fff;font-size:16px;font-weight:600;cursor:pointer;transition:background 0.2s}
-button:hover{background:#008f5b}
-.alert{padding:12px 16px;border-radius:8px;margin-bottom:20px;font-size:14px;display:none}
-.alert.success{background:rgba(0,168,107,0.15);border:1px solid #00a86b;color:#3fb950;display:block}
-.alert.error{background:rgba(248,81,73,0.15);border:1px solid #f85149;color:#f85149;display:block}
-footer{background:#161b22;border-top:1px solid #30363d;padding:24px;text-align:center;color:#8b949e;font-size:13px}
-</style>
-</head>
-<body>
-<header>
-  <a href="/" class="logo">Grocery<span>LK</span></a>
-  <nav><a href="/">Home</a><a href="/p/supermarket-price-comparison-sri-lanka">Price Guides</a></nav>
-</header>
-<main>
-  <div class="card">
-    <h1>Contact Us</h1>
-    <p class="sub">Have a question about grocery prices in Sri Lanka, spotted an incorrect price, or want to partner with us? Drop us a message below and we will get back to you via email.</p>
-    <div id="alertBox" class="alert"></div>
-    <form id="contactForm">
-      <div class="form-group">
-        <label for="name">Your Name</label>
-        <input type="text" id="name" name="name" required placeholder="e.g. Kasun Perera">
-      </div>
-      <div class="form-group">
-        <label for="email">Email Address</label>
-        <input type="email" id="email" name="email" required placeholder="e.g. kasun@example.com">
-      </div>
-      <div class="form-group">
-        <label for="subject">Subject</label>
-        <input type="text" id="subject" name="subject" placeholder="e.g. Incorrect price / Partnership inquiry">
-      </div>
-      <div class="form-group">
-        <label for="message">Message</label>
-        <textarea id="message" name="message" required placeholder="Type your message here..."></textarea>
-      </div>
-      <button type="submit" id="submitBtn">Send Message</button>
-    </form>
-  </div>
-</main>
-<footer>
-  &copy; 2026 GroceryLK. All rights reserved. Compare prices across Cargills, Kapruka, SPAR, Glomark, Arpico & GFC.
-</footer>
-<script>
-document.getElementById('contactForm').addEventListener('submit', async function(e) {
-  e.preventDefault();
-  const btn = document.getElementById('submitBtn');
-  const alertBox = document.getElementById('alertBox');
-  alertBox.className = 'alert';
-  alertBox.textContent = '';
-  btn.disabled = true;
-  btn.textContent = 'Sending...';
-
-  const data = {
-    name: document.getElementById('name').value,
-    email: document.getElementById('email').value,
-    subject: document.getElementById('subject').value,
-    message: document.getElementById('message').value,
-  };
-
-  try {
-    const res = await fetch('/api/contact', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error || 'Failed to send message');
-    alertBox.className = 'alert success';
-    alertBox.textContent = json.message || 'Message sent successfully!';
-    document.getElementById('contactForm').reset();
-  } catch (err) {
-    alertBox.className = 'alert error';
-    alertBox.textContent = err.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Send Message';
-  }
-});
-</script>
-</body>
-</html>`)
-})
-
-app.post('/api/contact', express.json(), async (req, res) => {
-  const { name, email, subject, message } = req.body || {}
-  if (!name || !email || !message) {
-    return res.status(400).json({ error: 'Name, email, and message are required.' })
-  }
-  try {
-    const db = getDb()
-    if (db) {
-      await db.execute({
-        sql: `INSERT INTO contact_messages (name, email, subject, message, ip) VALUES (?, ?, ?, ?, ?)`,
-        args: [name.trim(), email.trim(), (subject || '').trim(), message.trim(), req.ip || '']
-      })
-    }
-    res.json({ success: true, message: 'Your message has been sent successfully. Thank you for contacting GroceryLK!' })
-  } catch (e) {
-    console.error('Contact save error:', e)
-    res.status(500).json({ error: 'Failed to save message. Please try again later.' })
-  }
-})
-
-// ─── Admin dashboard page ───
-app.get('/api/myip', (req, res) => res.json({ ip: req.ip }));
-
-app.get('/admin', (req, res, next) => {
-  const pw = req.query.pw
-  if (pw !== ADMIN_PASSWORD) {
-    return res.type('html').send(
-      '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin</title><style>body{font-family:system-ui,sans-serif;background:#0d1117;color:#c9d1d9;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}form{background:#161b22;padding:32px;border-radius:8px;border:1px solid #30363d}input{display:block;width:100%;padding:10px;margin:12px 0;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#fff;font-size:16px}button{width:100%;padding:10px;background:#00a86b;border:none;border-radius:6px;color:#fff;font-size:16px;cursor:pointer}h2{margin:0 0 8px}</style></head><body><form method="GET" action="/admin"><h2>Admin Login</h2><input type="password" name="pw" placeholder="Password" autofocus/><button type="submit">Enter</button></form></body></html>'
-    )
-  }
-  next()
-})
-
-app.get('/admin', (req, res) => {
-  res.type('html').send(
-    '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">' +
-    '<title>GroceryLK Analytics</title>' +
-    '<style>' +
-    '*{margin:0;padding:0;box-sizing:border-box}' +
-    'body{font-family:system-ui,-apple-system,sans-serif;background:#0d1117;color:#c9d1d9;padding:40px 24px;max-width:800px;margin:0 auto}' +
-    'h1{font-size:24px;margin-bottom:8px;color:#00a86b}' +
-    '.sub{font-size:13px;color:#8b949e;margin-bottom:32px}' +
-    '.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;margin-bottom:16px}' +
-    '.card h2{font-size:14px;text-transform:uppercase;letter-spacing:1px;color:#8b949e;margin-bottom:12px}' +
-    '.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}' +
-    '.big-stat{text-align:center;padding:24px;background:#0d1117;border:2px solid #00a86b;border-radius:8px;margin-bottom:16px}' +
-    '.big-stat-value{font-size:48px;font-weight:700;color:#00a86b}' +
-    '.big-stat-label{font-size:13px;color:#8b949e;margin-top:4px;text-transform:uppercase;letter-spacing:1px}' +
-
-    '.stat{text-align:center;padding:16px;background:#0d1117;border:1px solid #30363d;border-radius:6px}' +
-    '.stat-value{font-size:28px;font-weight:700;color:#f0f6fc}' +
-    '.stat-label{font-size:11px;color:#8b949e;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px}' +
-    '</style></head><body>' +
-    '<h1>GroceryLK</h1><p class="sub">Analytics Dashboard</p>' +
-    '<div id="app"><p style="text-align:center;padding:60px;color:#8b949e;font-size:14px">Loading...</p></div>' +
-    '<script>' +
-    'var myIp=localStorage.getItem("myip")||"";' +
-    'if(!myIp){fetch("/api/myip").then(function(r){return r.json()}).then(function(d){myIp=d.ip;loadData()}).catch(function(){loadData()})}else{loadData()}' +
-    'function loadData(){fetchData()}' +
-    'function fetchData(){' +
-    'var url="/api/analytics/dashboard";' +
-    'if(myIp)url+="?exclude_ip="+encodeURIComponent(myIp);' +
-    'fetch(url).then(function(r){return r.json()}).then(function(d){' +
-    'var maxQ=d.topQueries&&d.topQueries.length?Math.max.apply(null,d.topQueries.map(function(x){return x.c})):1;' +
-    'var maxU=d.dailyUnique&&d.dailyUnique.length?Math.max.apply(null,d.dailyUnique.map(function(x){return x.c})):1;' +
-    'var html=' +
-    '"<div style=\\"margin-bottom:20px;display:flex;gap:8px;align-items:center;flex-wrap:wrap\\"><span style=\\"font-size:12px;color:#8b949e\\">Your IP:</span><input id=\\"ipInput\\" value=\\""+myIp+"\\" style=\\"padding:6px 10px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:13px;width:160px\\" placeholder=\\"Enter your IP\\"/><button onclick=\\"saveIp()\\" style=\\"padding:6px 14px;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:12px;cursor:pointer\\">Exclude me</button><span style=\\"font-size:11px;color:#555\\">(reloads chart)</span></div>" +' +
-    '"<div class=\\"big-stat\\"><div class=\\"big-stat-value\\">"+d.todayVisitors+"</div><div class=\\"big-stat-label\\">Real People Today</div></div>" +' +
-    '"<div class=\\"card\\"><div class=\\"stats\\">" +' +
-    '"<div class=\\"stat\\"><div class=\\"stat-value\\">"+d.totalVisits+"</div><div class=\\"stat-label\\">Total All Time</div></div>" +' +
-    '"<div class=\\"stat\\"><div class=\\"stat-value\\">"+d.yesterdayVisitors+"</div><div class=\\"stat-label\\">Yesterday</div></div>" +' +
-    '"<div class=\\"stat\\"><div class=\\"stat-value\\">"+d.totalSearches+"</div><div class=\\"stat-label\\">Searches</div></div>" +' +
-    '"</div></div>" +' +
-    '"<div class=\\"card\\"><h2>Top Searches</h2>";' +
-    'if(d.topQueries&&d.topQueries.length){' +
-    'for(var i=0;i<d.topQueries.length;i++){' +
-    'var q=d.topQueries[i];var pct=Math.round(q.c/maxQ*100);' +
-    'html+="<div style=\\"margin-bottom:10px\\"><div style=\\"display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px\\"><span>"+(q.q||"(empty)")+"</span><span style=\\"color:#8b949e\\">"+q.c+"</span></div><div style=\\"background:#21262d;border-radius:4px;height:8px\\"><div style=\\"display:inline-block;height:8px;border-radius:4px;background:#00a86b;min-width:4px;width:"+pct+"%\\"></div></div></div>"' +
-    '}}else{html+="<p style=\\"color:#8b949e;font-size:13px\\">No searches yet</p>"}' +
-    'html+="</div><div class=\\"card\\"><h2>Unique Visitors / Day (last 14 days)</h2>";' +
-    'if(d.dailyUnique&&d.dailyUnique.length){' +
-    'for(var i=0;i<d.dailyUnique.length;i++){' +
-    'var day=d.dailyUnique[i];var pct=Math.round(day.c/maxU*100);' +
-    'html+="<div style=\\"margin-bottom:8px\\"><div style=\\"display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px\\"><span>"+day.day+"</span><span style=\\"color:#8b949e\\">"+day.c+"</span></div><div style=\\"background:#21262d;border-radius:4px;height:8px\\"><div style=\\"display:inline-block;height:8px;border-radius:4px;background:#00a86b;min-width:4px;width:"+pct+"%\\"></div></div></div>"' +
-    '}}else{html+="<p style=\\"color:#8b949e;font-size:13px\\">No activity yet</p>"}' +
-    'html+="</div>";' +
-    'if(d.countries&&d.countries.length){' +
-    'html+="<div class=\\"card\\"><h2>Visitors by Country</h2>";' +
-    'var maxC=Math.max.apply(null,d.countries.map(function(x){return x.c}));' +
-    'var flags={LK:"🇱🇰",US:"🇺🇸",GB:"🇬🇧",CA:"🇨🇦",AU:"🇦🇺",IN:"🇮🇳",AE:"🇦🇪",SA:"🇸🇦",JP:"🇯🇵",DE:"🇩🇪",FR:"🇫🇷"};' +
-    'for(var i=0;i<d.countries.length;i++){' +
-    'var co=d.countries[i];var pct=Math.round(co.c/maxC*100);' +
-    'var flag=flags[co.country]||"";' +
-    'html+="<div style=\\"margin-bottom:8px\\"><div style=\\"display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px\\"><span>"+flag+" "+co.country+"</span><span style=\\"color:#8b949e\\">"+co.c+"</span></div><div style=\\"background:#21262d;border-radius:4px;height:8px\\"><div style=\\"display:inline-block;height:8px;border-radius:4px;background:#00a86b;min-width:4px;width:"+pct+"%\\"></div></div></div>"' +
-    '}html+="</div>"}' +
-    'if(d.todayVisitors===0&&d.totalVisits===0){html="<div class=\\"big-stat\\" style=\\"border-color:#ff6b6b\\"><div class=\\"big-stat-value\\" style=\\"color:#ff6b6b;font-size:32px\\">No visitors yet</div><div class=\\"big-stat-label\\">Share the site to get traffic!</div></div>"}' +
-    'document.getElementById("app").innerHTML=html;' +
-    '}).catch(function(){document.getElementById("app").innerHTML="<p style=\\"text-align:center;padding:60px;color:#8b949e;font-size:14px\\">Error loading data</p>"})' +
-    '}' +
-    'function saveIp(){localStorage.setItem("myip",document.getElementById("ipInput").value);location.reload()}' +
-    '</script></body></html>'
-  )
-})
+// ─── SEO routes (imported config from seo.js) ───
 
 // ─── SEO routes (imported config from seo.js) ───
 const BASE_URL = 'https://grocerylk.vercel.app'

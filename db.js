@@ -45,17 +45,6 @@ async function ensureReady() {
       PRIMARY KEY (product_key, recorded_at)
     )`)
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_price_history_key ON price_history(product_key)`)
-    await db.execute(`CREATE TABLE IF NOT EXISTS page_events (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      event_type TEXT NOT NULL,
-      session_id TEXT,
-      event_data TEXT,
-      ip TEXT,
-      user_agent TEXT,
-      country TEXT DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )`)
-    try { await db.execute(`ALTER TABLE page_events ADD COLUMN country TEXT DEFAULT ''`) } catch {}
     await db.execute(`CREATE TABLE IF NOT EXISTS cached_data (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,
@@ -142,68 +131,6 @@ export async function setCachedSearch(query, stores, sort, data) {
       ],
     })
   } catch (e) {}
-}
-
-export async function recordEvent(eventType, sessionId, data, ip, ua, country) {
-  await ensureReady()
-  try {
-    await db.execute({
-      sql: `INSERT INTO page_events (event_type, session_id, event_data, ip, user_agent, country) VALUES (?, ?, ?, ?, ?, ?)`,
-      args: [eventType, sessionId || '', data ? JSON.stringify(data) : '', ip || '', ua || '', country || ''],
-    })
-  } catch (e) {}
-}
-
-export async function getAnalyticsSummary(excludeIp) {
-  await ensureReady()
-  const safeIp = excludeIp ? excludeIp.replace(/\s/g, '').replace(/[^\x21-\x7E]/g, '') : ''
-  const ipFilter = safeIp ? `AND ip != '${safeIp.replace(/'/g, "''")}'` : ''
-  try {
-    const [visits, searches, lists] = await Promise.all([
-      db.execute({ sql: `SELECT COUNT(DISTINCT session_id) as c FROM page_events WHERE event_type = 'visit' ${ipFilter}` }).then(r => r.rows[0]?.c || 0),
-      db.execute({ sql: `SELECT COUNT(*) as c FROM page_events WHERE event_type = 'search' ${ipFilter}` }).then(r => r.rows[0]?.c || 0),
-      db.execute({ sql: `SELECT COUNT(*) as c FROM page_events WHERE event_type = 'add_to_list'` }).then(r => r.rows[0]?.c || 0),
-    ])
-    const topQueries = await db.execute({
-      sql: `SELECT json_extract(event_data, '$.query') as q, COUNT(*) as c
-            FROM page_events WHERE event_type = 'search' AND event_data IS NOT NULL ${ipFilter}
-            GROUP BY q ORDER BY c DESC LIMIT 10`,
-    }).then(r => r.rows)
-    const daily = await db.execute({
-      sql: `SELECT date(created_at) as day, COUNT(*) as c
-            FROM page_events WHERE created_at > datetime('now', '-14 days') ${ipFilter}
-            GROUP BY day ORDER BY day ASC`,
-    }).then(r => r.rows)
-    const dailyUnique = await db.execute({
-      sql: `SELECT date(created_at) as day, COUNT(DISTINCT session_id) as c
-            FROM page_events WHERE created_at > datetime('now', '-14 days') AND event_type = 'visit' ${ipFilter}
-            GROUP BY day ORDER BY day ASC`,
-    }).then(r => r.rows)
-    const countries = await db.execute({
-      sql: `SELECT COALESCE(NULLIF(country, ''), 'Unknown') as country, COUNT(*) as c
-            FROM page_events WHERE event_type = 'visit' ${ipFilter}
-            GROUP BY country ORDER BY c DESC`,
-    }).then(r => r.rows)
-    const yesterday = await db.execute({
-      sql: `SELECT COUNT(DISTINCT session_id) as c FROM page_events
-            WHERE event_type = 'visit' AND date(created_at) = date('now', '-1 day') ${ipFilter}`,
-    }).then(r => r.rows[0]?.c || 0)
-    const today = await db.execute({
-      sql: `SELECT COUNT(DISTINCT session_id) as c FROM page_events
-            WHERE event_type = 'visit' AND date(created_at) = date('now') ${ipFilter}`,
-    }).then(r => r.rows[0]?.c || 0)
-    return {
-      totalVisits: visits,
-      totalSearches: searches,
-      totalListsCreated: lists,
-      todayVisitors: today,
-      yesterdayVisitors: yesterday,
-      topQueries: topQueries || [],
-      dailyEvents: daily || [],
-      dailyUnique: dailyUnique || [],
-      countries: countries || [],
-    }
-  } catch (e) { return {} }
 }
 
 const CAT_CACHE_TTL = 24 * 60 * 60 * 1000
