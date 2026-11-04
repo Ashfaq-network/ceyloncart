@@ -959,6 +959,153 @@ app.get('/api/price-history', async (req, res) => {
   }
 });
 
+// ─── Contact Us Page & Email API ───
+app.get('/contact', (req, res) => {
+  res.type('html').send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Contact Us — GroceryLK Sri Lanka</title>
+<meta name="description" content="Get in touch with the GroceryLK team for questions, feedback, store price reporting, or advertising inquiries.">
+<link rel="canonical" href="${BASE_URL}/contact">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh;display:flex;flex-direction:column}
+header{background:#161b22;border-bottom:1px solid #30363d;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:20px;font-weight:800;color:#f0f6fc;text-decoration:none}
+.logo span{color:#00a86b}
+nav a{color:#8b949e;text-decoration:none;font-size:14px;margin-left:20px}
+nav a:hover{color:#00a86b}
+main{flex:1;max-width:640px;width:100%;margin:40px auto;padding:0 20px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:32px}
+h1{font-size:28px;color:#f0f6fc;margin-bottom:8px}
+p.sub{color:#8b949e;font-size:14px;margin-bottom:24px;line-height:1.6}
+.form-group{margin-bottom:20px}
+label{display:block;font-size:13px;font-weight:600;color:#c9d1d9;margin-bottom:6px}
+input,textarea{width:100%;padding:12px 16px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#fff;font-size:15px;font-family:inherit}
+input:focus,textarea:focus{outline:none;border-color:#00a86b}
+textarea{min-height:140px;resize:vertical}
+button{width:100%;padding:14px;background:#00a86b;border:none;border-radius:8px;color:#fff;font-size:16px;font-weight:600;cursor:pointer;transition:background 0.2s}
+button:hover{background:#008f5b}
+.alert{padding:12px 16px;border-radius:8px;margin-bottom:20px;font-size:14px;display:none}
+.alert.success{background:rgba(0,168,107,0.15);border:1px solid #00a86b;color:#3fb950;display:block}
+.alert.error{background:rgba(248,81,73,0.15);border:1px solid #f85149;color:#f85149;display:block}
+footer{background:#161b22;border-top:1px solid #30363d;padding:24px;text-align:center;color:#8b949e;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <a href="/" class="logo">Grocery<span>LK</span></a>
+  <nav><a href="/">Home</a><a href="/p/supermarket-price-comparison-sri-lanka">Price Guides</a></nav>
+</header>
+<main>
+  <div class="card">
+    <h1>Contact Us</h1>
+    <p class="sub">Have a question about grocery prices in Sri Lanka, spotted an incorrect price, or want to partner with us? Drop us a message below and we will get back to you via email.</p>
+    <div id="alertBox" class="alert"></div>
+    <form id="contactForm">
+      <div class="form-group">
+        <label for="name">Your Name</label>
+        <input type="text" id="name" name="name" required placeholder="e.g. Kasun Perera">
+      </div>
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" required placeholder="e.g. kasun@example.com">
+      </div>
+      <div class="form-group">
+        <label for="subject">Subject</label>
+        <input type="text" id="subject" name="subject" placeholder="e.g. Incorrect price / Partnership inquiry">
+      </div>
+      <div class="form-group">
+        <label for="message">Message</label>
+        <textarea id="message" name="message" required placeholder="Type your message here..."></textarea>
+      </div>
+      <button type="submit" id="submitBtn">Send Message</button>
+    </form>
+  </div>
+</main>
+<footer>
+  &copy; 2026 GroceryLK. All rights reserved. Compare prices across Cargills, Kapruka, SPAR, Glomark, Arpico & GFC.
+</footer>
+<script>
+document.getElementById('contactForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  const alertBox = document.getElementById('alertBox');
+  alertBox.className = 'alert';
+  alertBox.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+
+  const data = {
+    name: document.getElementById('name').value,
+    email: document.getElementById('email').value,
+    subject: document.getElementById('subject').value,
+    message: document.getElementById('message').value,
+  };
+
+  try {
+    const res = await fetch('/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Failed to send message');
+    alertBox.className = 'alert success';
+    alertBox.textContent = json.message || 'Message sent successfully!';
+    document.getElementById('contactForm').reset();
+  } catch (err) {
+    alertBox.className = 'alert error';
+    alertBox.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send Message';
+  }
+});
+</script>
+</body>
+</html>`)
+})
+
+app.post('/api/contact', express.json(), async (req, res) => {
+  const { name, email, subject, message } = req.body || {}
+  if (!name || !email || !message) {
+    return res.status(400).json({ error: 'Name, email, and message are required.' })
+  }
+  try {
+    const db = getDb()
+    if (db) {
+      await db.execute({
+        sql: `INSERT INTO contact_messages (name, email, subject, message, ip) VALUES (?, ?, ?, ?, ?)`,
+        args: [name.trim(), email.trim(), (subject || '').trim(), message.trim(), req.ip || '']
+      })
+    }
+
+    if (process.env.RESEND_API_KEY && process.env.CONTACT_EMAIL) {
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`
+        },
+        body: JSON.stringify({
+          from: 'GroceryLK Contact <onboarding@resend.dev>',
+          to: process.env.CONTACT_EMAIL,
+          subject: `[GroceryLK Contact] ${subject || 'New Message'} from ${name}`,
+          text: `Name: ${name}\nEmail: ${email}\nSubject: ${subject}\n\nMessage:\n${message}`
+        })
+      }).catch(err => console.error('Email send error:', err))
+    }
+
+    res.json({ success: true, message: 'Your message has been sent successfully. Thank you for contacting GroceryLK!' })
+  } catch (e) {
+    console.error('Contact error:', e)
+    res.status(500).json({ error: 'Failed to save message. Please try again later.' })
+  }
+})
+
 // ─── SEO routes (imported config from seo.js) ───
 
 // ─── SEO routes (imported config from seo.js) ───
