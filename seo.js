@@ -759,6 +759,58 @@ export const SEO_PAGES = [
       'This page is the hub for the whole comparison: every grocery category is listed below with the live per-item prices from all six stores. Browse the category you shop most to see who is cheapest today.',
     ],
   },
+  {
+    slug: 'coconut-milk-price-sri-lanka',
+    query: 'coconut milk',
+    name: 'Coconut Milk',
+    title: 'Coconut Milk & Cream Price in Sri Lanka — All Stores',
+    desc: 'Compare coconut milk and coconut cream prices in Sri Lanka across Cargills, Kapruka, SPAR, Glomark & Arpico. Find the best deals today.',
+    category: 'staples',
+    size: 'per pack',
+    body: [
+      'Coconut milk is a foundational ingredient in Sri Lankan cooking, used in curries, sambols and desserts. GroceryLK compares live coconut milk and cream prices across Cargills, Kapruka, SPAR, Glomark and Arpico.',
+      'Available in UHT liquid packs, milk powder packets and canned coconut cream, prices vary by brand and volume. Comparing units ensures you find the best value.',
+      'Check back daily for up-to-date coconut milk prices across Sri Lanka’s top supermarkets.',
+    ],
+  },
+  {
+    slug: 'garlic-price-sri-lanka',
+    query: 'garlic',
+    name: 'Garlic',
+    title: 'Garlic Price in Sri Lanka Today — Per 1kg & Pack',
+    desc: 'Compare fresh garlic prices in Sri Lanka. See live per 1kg and pack prices at Cargills, Kapruka, SPAR, Glomark & Arpico.',
+    category: 'vegetables',
+    size: 'per kg',
+    body: [
+      'Garlic is an essential aromatic in Sri Lankan kitchens. GroceryLK tracks live garlic prices per 1kg and per pack across Cargills, Kapruka, SPAR, Glomark and Arpico.',
+      'Garlic prices fluctuate with import supply and seasonal availability. Check the live comparison before buying to get the best value.',
+    ],
+  },
+  {
+    slug: 'baby-formula-price-sri-lanka',
+    query: 'baby milk',
+    name: 'Baby Formula',
+    title: 'Baby Formula & Milk Powder Price in Sri Lanka — All Brands',
+    desc: 'Compare baby formula and infant milk powder prices in Sri Lanka across Cargills, Kapruka, SPAR, Glomark & Arpico.',
+    category: 'baby',
+    size: 'per tin',
+    body: [
+      'Baby formula and infant milk powder are vital recurring expenses for parents in Sri Lanka. GroceryLK compares live prices for popular baby milk brands across Cargills, Kapruka, SPAR, Glomark and Arpico.',
+      'Prices vary by stage and tin size. Compare live store prices to ensure affordability.',
+    ],
+  },
+  {
+    slug: 'dishwash-liquid-price-sri-lanka',
+    query: 'dishwash',
+    name: 'Dishwash Liquid',
+    title: 'Dishwash Liquid & Paste Price in Sri Lanka — All Brands',
+    desc: 'Compare dishwashing liquid, paste and soap prices in Sri Lanka across Cargills, Kapruka, SPAR, Glomark & Arpico.',
+    category: 'household',
+    size: 'per bottle',
+    body: [
+      'Dishwashing liquid and paste are daily kitchen cleaning essentials. GroceryLK compares live prices across Cargills, Kapruka, SPAR, Glomark and Arpico so you can save on household supplies.',
+    ],
+  },
 ]
 
 // Category hubs — /category/:slug aggregate related products into a hub page.

@@ -12,6 +12,7 @@ export default function Footer() {
         <div className="footer-links">
           <span className="footer-link" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>{t('about.home')}</span>
           <a className="footer-link" href="#about">{t('about.about')}</a>
+          <a className="footer-link" href="/contact">Contact Us</a>
         </div>
         <div className="footer-stores">
           {['Kapruka', 'Cargills', 'Global Food City', 'SPAR', 'Glomark', 'Arpico'].map(s => (
