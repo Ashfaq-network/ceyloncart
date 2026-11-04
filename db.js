@@ -22,6 +22,8 @@ let ready = null
 async function ensureReady() {
   if (ready) return ready
   ready = (async () => {
+    try { await db.execute(`PRAGMA journal_mode=WAL`) } catch {}
+    try { await db.execute(`PRAGMA synchronous=NORMAL`) } catch {}
     await db.execute(`CREATE TABLE IF NOT EXISTS cached_searches (
       query TEXT NOT NULL,
       store_filter TEXT NOT NULL DEFAULT '',

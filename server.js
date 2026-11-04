@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import path from 'path';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -52,6 +53,7 @@ const corsOpts = {
 }
 app.use(cors(corsOpts))
 app.options('*', cors(corsOpts))
+app.use(compression())
 app.use(express.json());
 app.use(express.text({ type: 'text/plain' }));
 
@@ -604,6 +606,7 @@ const HOMEPAGE_SECTIONS = {
 };
 
 app.get('/api/homepage', async (req, res) => {
+  res.set('Cache-Control', 'public, max-age=300, s-maxage=900')
   const db = getDb()
   if (db) {
     const cached = await db.execute({
@@ -654,6 +657,7 @@ app.get('/api/homepage', async (req, res) => {
 });
 
 app.get('/api/search', async (req, res) => {
+  res.set('Cache-Control', 'public, max-age=60, s-maxage=300')
   try {
     const { q, category, limit, sort, cursor, stores: storeFilter, skipCache, fast } = req.query;
     const query = (q || '').trim();
