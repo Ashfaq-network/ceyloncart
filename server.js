@@ -80,7 +80,7 @@ app.use('/api/basket', strictLimiter)
 
 // ─── API key check ───
 app.use('/api', (req, res, next) => {
-  const exempt = ['/myip', '/product-image', '/indexnow']
+  const exempt = ['/myip', '/product-image', '/indexnow', '/contact']
   if (exempt.some(p => req.path.startsWith(p))) return next()
   const key = req.headers['x-api-key'] || req.query.api_key
   if (!key || key !== API_KEY) {
